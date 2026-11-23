@@ -241,6 +241,8 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 .pips i.on { background: var(--t-review); }
 .today-n { font-family: var(--f-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .today .steps { padding-bottom: 10px; }
+
+.pick button.full { padding: 0 12px; font-family: var(--f-body); font-weight: 600; }
 </style>
 
 </head>
@@ -466,7 +468,7 @@ const CARDS = [
       ["A", "Nice talking to you. See you later!", "얘기 나눠서 즐거웠어요. 나중에 봐요!"]
     ] }
 ];
-const APP_VERSION = "11.23-6 (새 화면)";
+const APP_VERSION = "11.23-7 (미션 전체 녹음)";
 const MIC_ICON = '<svg><use href="#i-mic"/></svg>';
 const REC_LABEL = "녹음 시작";
 
@@ -500,7 +502,7 @@ const cur = () => { const v = view(); return v.length ? CARDS[v[pos]] : null; };
 
 /* ---------- 연습 문장 목록 ---------- */
 function lines(c) {
-  if (c.lines) return c.lines.map(l => ({ en: l[0], ko: l[1] }));
+  if (c.lines) return [{ en: c.example, ko: "대본 전체를 한 번에 (30초 안에)", full: true }].concat(c.lines.map(l => ({ en: l[0], ko: l[1] })));
   const out = c.items.map(it => ({ en: strip(it[1]), ko: it[0] }));
   if (c.dialog) c.dialog.forEach(d => out.push({ en: d[1], ko: d[2], who: d[0] }));
   return out;
@@ -559,7 +561,7 @@ function renderCard(c) {
        <div class="script"><span class="en">${c.example}</span></div>
        ${sayBtns(c.example)}
        <p class="trans">${c.trans}</p>
-       <p class="hint">대본 없이 3번 말한 뒤, '문장 연습' 탭에서 녹음해요</p>`;
+       <p class="hint">대본 없이 3번 말한 뒤, '문장 연습' 탭에서 '전체'를 골라 한 번에 녹음해요</p>`;
     return;
   }
   front.innerHTML = head(c, "앞면") +
@@ -603,7 +605,7 @@ function flip() { if (!cur()) return; flipped = !flipped; render(); }
 
 /* ---------- 문장 연습: 녹음 / 비교 / 발음 확인 ---------- */
 const recs = {}, recBlobs = {}, anaCache = {};               // "강-문장" → blob URL (앱을 닫으면 사라짐)
-let recorder = null, chunks = [], player = new Audio(), micStream = null;
+let recorder = null, chunks = [], player = new Audio(), micStream = null, recTimer = null;
 const key = () => `${cur().n}-${sel}`;
 const REC_OK = !!(navigator.mediaDevices && window.MediaRecorder);
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -611,8 +613,11 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 function renderPractice(c) {
   const ls = lines(c);
   if (sel >= ls.length) sel = 0;
-  $("pick").innerHTML = ls.map((l, i) =>
-    `<button aria-pressed="${i === sel}" class="${recs[`${c.n}-${i}`] ? "has-rec" : ""}" data-i="${i}" aria-label="${i + 1}번 문장">${l.who ? l.who + (i - c.items.length + 1) : i + 1}</button>`).join("");
+  let num = 0;
+  $("pick").innerHTML = ls.map((l, i) => {
+    const lab = l.full ? "전체" : l.who ? l.who + (i - c.items.length + 1) : String(++num);
+    return `<button aria-pressed="${i === sel}" class="${recs[`${c.n}-${i}`] ? "has-rec" : ""}${l.full ? " full" : ""}" data-i="${i}" aria-label="${l.full ? "대본 전체" : lab + "번 문장"}">${lab}</button>`;
+  }).join("");
   $("tEn").textContent = ls[sel].en;
   $("tKo").textContent = ls[sel].ko;
   const has = !!recs[key()];
@@ -657,8 +662,9 @@ $("pRec").onclick = async () => {
   recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   recorder.onstop = () => {
     stream.getTracks().forEach(t => t.stop()); if (micStream === stream) micStream = null;
+    clearInterval(recTimer);
     btn.textContent = REC_LABEL; btn.classList.remove("on");
-    const sentence = target();
+    const sentence = target(), isFull = !!lines(cur())[sel].full;
     let blob = null;
     if (chunks.length) {
       if (recs[k]) URL.revokeObjectURL(recs[k]);
@@ -667,11 +673,14 @@ $("pRec").onclick = async () => {
     }
     if (cur() && key() === k) {
       renderPractice(cur());
-      if (blob) analyze(blob, sentence, k);
+      if (blob) analyze(blob, sentence, k, isFull);
     }
   };
   recorder.start();
-  btn.textContent = "정지하고 분석하기"; btn.classList.add("on");
+  const t0 = Date.now();
+  btn.textContent = "정지하고 분석하기 · 0초"; btn.classList.add("on");
+  clearInterval(recTimer);
+  recTimer = setInterval(() => { if (recorder && recorder.state === "recording") btn.textContent = `정지하고 분석하기 · ${Math.floor((Date.now() - t0) / 1000)}초`; }, 500);
 };
 function playMine() {
   return new Promise(res => {
@@ -722,7 +731,7 @@ function pitchOf(x, sr) {          // 자기상관으로 목소리 높이(Hz) �
 }
 const median = a => { if (!a.length) return 0; const b = a.slice().sort((p, q) => p - q); return b[Math.floor(b.length / 2)]; };
 
-async function analyze(blob, sentence, k) {
+async function analyze(blob, sentence, k, isFull) {
   const box = $("ana");
   box.hidden = false;
   $("anaFocus").textContent = "분석하고 있어요…";
@@ -806,6 +815,10 @@ async function analyze(blob, sentence, k) {
     else if (!isQ && tune > 1.18) { tuneMsg = "끝이 올라가서 질문처럼 들릴 수 있어요"; tuneSt = "warn"; }
     else tuneMsg = isQ ? "의문사 질문답게 끝을 자연스럽게 내렸어요" : "문장 끝을 자연스럽게 내렸어요";
     M.push(["억양", tuneMsg, tuneSt]);
+    if (isFull) {
+      const sec = Math.round(speechSec);
+      M.unshift(["길이", sec <= 30 ? `${sec}초 · 30초 안에 말했어요` : `${sec}초 · 목표 30초보다 길어요`, sec <= 30 ? "good" : "warn"]);
+    }
 
     // 고칠 곳 1개: 끊김 → 억양 → 속도 순서로 가장 중요한 것 하나
     let focus;
@@ -851,23 +864,30 @@ function srAbort() {
   if (srNow) { try { srNow.onresult = srNow.onerror = srNow.onend = null; srNow.abort(); } catch (e) {} }
   srCleanup();
 }
-function listen({ onText, onFail, onEnd }) {
+function listen({ onText, onFail, onEnd, long }) {
   srAbort();
   const r = new SR(); srNow = r; srEndHook = onEnd;
-  r.lang = "en-US"; r.interimResults = false; r.continuous = false; r.maxAlternatives = 1;
-  let got = false;
-  r.onresult = e => { got = true; onText(e.results[0][0].transcript); };
+  r.lang = "en-US"; r.interimResults = false; r.continuous = !!long; r.maxAlternatives = 1;
+  let got = false, parts = [], delivered = false;
+  // 긴 대본: 문장마다 들어오는 결과를 모아 두었다가 끝날 때 한 번에 채점
+  const deliver = () => { if (long && parts.length && !delivered) { delivered = true; onText(parts.join(" ")); } };
+  r._deliver = deliver;
+  r.onresult = e => {
+    got = true;
+    if (long) parts = Array.from(e.results).filter(x => x.isFinal).map(x => x[0].transcript.trim());
+    else onText(e.results[0][0].transcript);
+  };
   r.onerror = e => { if (!got) onFail(e.error); };
-  r.onend = () => { if (srNow === r) { if (!got) onFail("no-speech"); srCleanup(); } };
-  // 10초가 지나도 끝나지 않으면 강제로 정리 (휴대폰에서 가끔 멈추는 문제 방지)
-  srWatch = setTimeout(() => { if (srNow === r) { try { r.abort(); } catch (e) {} if (!got) onFail("timeout"); srCleanup(); } }, 10000);
+  r.onend = () => { if (srNow === r) { deliver(); if (!got) onFail("no-speech"); srCleanup(); } };
+  // 정해진 시간이 지나도 끝나지 않으면 강제로 정리 (휴대폰에서 가끔 멈추는 문제 방지)
+  srWatch = setTimeout(() => { if (srNow === r) { try { r.abort(); } catch (e) {} deliver(); if (!got) onFail("timeout"); srCleanup(); } }, long ? 45000 : 10000);
   try { r.start(); } catch (e) { onFail("busy"); srCleanup(); }
 }
 function srStopSoon() {   // 사용자가 '끝'을 눌렀을 때: 정상 종료를 기다리되 1.5초 넘으면 정리
   if (!srNow) return;
   const r = srNow;
   try { r.stop(); } catch (e) {}
-  setTimeout(() => { if (srNow === r) { try { r.abort(); } catch (e) {} srCleanup(); } }, 1500);
+  setTimeout(() => { if (srNow === r) { try { r.abort(); } catch (e) {} if (r._deliver) r._deliver(); srCleanup(); } }, 1500);
 }
 const failMsg = code =>
   code === "not-allowed" || code === "service-not-allowed" ? "마이크나 음성 인식이 허용되지 않았어요. 휴대폰 설정에서 이 브라우저의 마이크를 허용해 주세요."
@@ -886,9 +906,11 @@ $("pCheck").onclick = () => {
   }
   if (srNow && btn.classList.contains("on")) { srStopSoon(); return; }
   stopAll();
-  btn.textContent = "듣고 있어요… 말한 뒤 누르면 끝"; btn.classList.add("on");
+  const isFull = !!lines(cur())[sel].full;
+  btn.textContent = isFull ? "듣고 있어요… 대본을 다 말하면 누르세요" : "듣고 있어요… 말한 뒤 누르면 끝"; btn.classList.add("on");
   const want = target();
   listen({
+    long: isFull,
     onText: said => {
       const r = compare(said, want);
       const hit = r.filter(x => x.ok).length;
@@ -915,6 +937,7 @@ function resetMic() {
   if (recorder && recorder.state !== "inactive") { recorder.onstop = null; try { recorder.stop(); } catch (e) {} }
   recorder = null;
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  clearInterval(recTimer);
   $("pRec").textContent = REC_LABEL; $("pRec").classList.remove("on");
   $("pCheck").textContent = CHECK_LABEL; $("pCheck").classList.remove("on");
   $("qSpeak").innerHTML = MIC_ICON + "말하기"; $("qSpeak").classList.remove("on");
@@ -964,7 +987,7 @@ function quizJudge(ok, said, r) {
   $("qNext").textContent = quiz.i + 1 < quiz.total ? "다음 문제" : "결과 보기";
   if (ok) speak([quiz.cur.en], 0.9); else speak([quiz.cur.en, quiz.cur.en], 0.65);
 }
-$("qStart").onclick = () => quizStart(lines(cur()));
+$("qStart").onclick = () => quizStart(lines(cur()).filter(l => !l.full));
 $("qQuit").onclick = () => quizReset(cur());
 $("qSpeak").onclick = () => {
   const btn = $("qSpeak");
@@ -1001,7 +1024,7 @@ $("qNext").onclick = () => {
   show("qRetry", quiz.wrong.length > 0);
 };
 $("qRetry").onclick = () => quizStart(quiz.wrong);
-$("qRestart").onclick = () => quizStart(lines(cur()));
+$("qRestart").onclick = () => quizStart(lines(cur()).filter(l => !l.full));
 
 /* ---------- Claude와 연습 ---------- */
 const CLAUDE = {
