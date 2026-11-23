@@ -252,6 +252,9 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 .wk[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .wk[aria-pressed="true"] span { color: var(--paper); opacity: .75; }
 .items[hidden] { display: none; }
+.install.warn { border-style: solid; border-color: var(--t-mission); color: var(--ink); }
+.install a { color: var(--accent); font-weight: 600; }
+.stage .tool.on:not(.fill) { border-color: var(--sc); color: var(--sc); }
 </style>
 
 </head>
@@ -281,6 +284,7 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
   </header>
 
   <p class="install" id="installHint" hidden></p>
+  <p class="install warn" id="ttsWarn" hidden></p>
 
   <div class="scene">
     <div class="card" id="card" tabindex="0" role="button" aria-label="카드 뒤집기">
@@ -299,8 +303,8 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
   </details>
 
   <div class="tabs" role="tablist" aria-label="연습 방법">
-    <button role="tab" id="tab-quiz" aria-controls="pane-quiz" aria-selected="true"><svg><use href="#i-quiz"/></svg>퀴즈</button>
-    <button role="tab" id="tab-practice" aria-controls="pane-practice" aria-selected="false"><svg><use href="#i-practice"/></svg>문장 연습</button>
+    <button role="tab" id="tab-practice" aria-controls="pane-practice" aria-selected="true"><svg><use href="#i-practice"/></svg>문장 연습</button>
+    <button role="tab" id="tab-quiz" aria-controls="pane-quiz" aria-selected="false"><svg><use href="#i-quiz"/></svg>퀴즈</button>
     <button role="tab" id="tab-claude" aria-controls="pane-claude" aria-selected="false"><svg><use href="#i-claude"/></svg>AI 연습</button>
   </div>
 
@@ -456,10 +460,10 @@ const CARDS = [
       "I'm from <span class='blank'></span> <span class='opt'>(Seoul / Busan / Korea)</span>.",
       "I'm a(n) <span class='blank'></span> <span class='opt'>(student / teacher / office worker)</span>.",
       "I'm <span class='blank'></span> <span class='opt'>(good / okay)</span>.",
-      "Nice to meet you!"
+      "Thank you!"
     ],
-    example: "Hi, nice to meet you. I'm Minji. I'm from Busan, Korea. I'm an office worker. I'm good. Nice to meet you!",
-    trans: "안녕하세요, 만나서 반가워요. 저는 민지예요. 한국 부산에서 왔어요. 회사원이에요. 잘 지내요. 만나서 반가워요!" },
+    example: "Hi, nice to meet you. I'm Minji. I'm from Busan, Korea. I'm an office worker. I'm good. Thank you!",
+    trans: "안녕하세요, 만나서 반가워요. 저는 민지예요. 한국 부산에서 왔어요. 회사원이에요. 잘 지내요. 감사합니다!" },
   { n: 6, type: "review", title: "처음 만난 외국인과 자기소개 주고받기",
     items: [
       ["당신은요?", "What about you?", "내 소개 뒤 상대에게 돌려주기"],
@@ -672,7 +676,7 @@ const CARDS = [
 ];
 CARDS.forEach(c => { c.w = Math.ceil(c.n / 6); });
 
-const APP_VERSION = "11.23-10 (Part 1 전체)";
+const APP_VERSION = "11.24-1 (탭 순서·재생 멈춤)";
 const MIC_ICON = '<svg><use href="#i-mic"/></svg>';
 const REC_LABEL = "녹음 시작";
 
@@ -683,7 +687,7 @@ CARDS[4].lines = [
   ["I'm from Busan, Korea.", "한국 부산에서 왔어요."],
   ["I'm an office worker.", "회사원이에요."],
   ["I'm good.", "잘 지내요."],
-  ["Nice to meet you!", "만나서 반가워요!"]
+  ["Thank you!", "감사합니다!"]
 ];
 
 const TYPE = { lesson: "핵심", pron: "발음특강", mission: "실전미션", review: "복습" };
@@ -750,7 +754,7 @@ function sayBtns(text) {
 }
 back.addEventListener("click", e => {
   const b = e.target.closest(".say"); if (!b) return;
-  e.stopPropagation(); speak([b.dataset.say], +b.dataset.rate);
+  e.stopPropagation(); stopAll(); speak([b.dataset.say], +b.dataset.rate);
 });
 
 /* ---------- 카드 ---------- */
@@ -845,10 +849,20 @@ $("pick").addEventListener("click", e => {
   sel = +b.dataset.i; stopAll(); renderPractice(cur());
 });
 const target = () => lines(cur())[sel].en;
-$("pListen").onclick = () => speak([target()], 0.9);
-$("pSlow").onclick = () => speak([target()], 0.65);
+$("pListen").onclick = () => { stopAll(); speak([target()], 0.9); };
+$("pSlow").onclick = () => { stopAll(); speak([target()], 0.65); };
 
+let playToken = 0, playMode = null;
+function setPlayUI(mode) {
+  playMode = mode;
+  $("pMine").textContent = mode === "mine" ? "■ 멈춤" : "내 녹음 듣기";
+  $("pCompare").textContent = mode === "compare" ? "■ 멈춤" : "원어민과 번갈아";
+  $("pMine").classList.toggle("on", mode === "mine");
+  $("pCompare").classList.toggle("on", mode === "compare");
+}
 function stopAll() {
+  playToken++;                       // 진행 중이던 재생 순서를 모두 취소
+  if (playMode) setPlayUI(null);
   if (typeof srAbort === "function") srAbort();
   if (TTS) speechSynthesis.cancel();
   player.pause();
@@ -903,12 +917,23 @@ function playMine() {
     player.play().catch(() => res());
   });
 }
-$("pMine").onclick = () => { stopAll(); playMine(); };
-$("pCompare").onclick = async () => {
+$("pMine").onclick = async () => {
+  if (playMode === "mine") { stopAll(); return; }
   stopAll();
-  await speak([target()], 0.9);
-  await new Promise(r => setTimeout(r, 400));
+  const t = playToken; setPlayUI("mine");
   await playMine();
+  if (t === playToken) setPlayUI(null);
+};
+$("pCompare").onclick = async () => {
+  if (playMode === "compare") { stopAll(); return; }
+  stopAll();
+  const t = playToken; setPlayUI("compare");
+  await speak([target()], 0.9);
+  if (t !== playToken) return;
+  await new Promise(r => setTimeout(r, 400));
+  if (t !== playToken) return;
+  await playMine();
+  if (t === playToken) setPlayUI(null);
 };
 
 /* ---------- 녹음 분석: 속도 · 끊김 · 문장 끝 억양 ---------- */
@@ -1314,12 +1339,12 @@ function stepList(c) {
   const s = [
     ["듣기", "'문장 연습' 탭 ① 듣기로 문장마다 3번 듣기"],
     ["따라 말하기", "문장마다 10번, 마지막 3번은 카드 보지 않고"],
-    ["퀴즈", "'퀴즈' 탭에서 모든 문장 정답 받기"],
     ["녹음하고 분석", "② 녹음 → '고칠 곳 1개'를 고쳐서 다시 녹음"],
     ["발음 확인", "③ 발음 확인에서 모든 단어가 초록색이면 통과"],
+    ["퀴즈", "'퀴즈' 탭에서 모든 문장 정답 받기"],
     ["AI와 연습", "'AI 연습' 탭에서 상황극·피드백 연습"]
   ];
-  if (c.type === "mission") s.splice(2, 1, ["대본 완성", "빈칸을 내 정보로 채우고 대본 없이 3번 말하기"]);
+  if (c.type === "mission") s.splice(4, 1, ["대본 완성", "빈칸을 내 정보로 채우고 대본 없이 3번 말하기"]);
   if (!hasAI(c)) s.pop();
   return s;
 }
@@ -1399,10 +1424,17 @@ if (!standalone) {
 }
 $("ver").textContent = "버전 " + APP_VERSION;
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
-if (!TTS) { $("pListen").disabled = true; $("pSlow").disabled = true; }
+if (!TTS) {
+  $("pListen").disabled = true; $("pSlow").disabled = true;
+  const android = /Android/i.test(navigator.userAgent);
+  const chromeLink = "intent://" + location.host + location.pathname + "#Intent;scheme=https;package=com.android.chrome;end";
+  $("ttsWarn").hidden = false;
+  $("ttsWarn").innerHTML = "지금 연 브라우저에는 영어 읽어주기 기능이 없어서 듣기 버튼이 꺼져 있어요. 녹음과 발음 확인은 돼요." +
+    (android ? ` <a href="${chromeLink}">Chrome에서 열기</a>` : " Safari나 Chrome에서 열어 주세요.");
+}
 
 /* ---------- 탭 ---------- */
-const TABS = ["quiz", "practice", "claude"];
+const TABS = ["practice", "quiz", "claude"];
 function setTab(name, save = true) {
   TABS.forEach(t => {
     $("tab-" + t).setAttribute("aria-selected", t === name);
@@ -1414,8 +1446,8 @@ function syncTabs(c) {    // 이 카드에 AI 연습이 없으면 탭을 숨기�
   const ai = hasAI(c);
   $("tab-claude").hidden = !ai;
   document.querySelector(".tabs").classList.toggle("two", !ai);
-  let want = store.get("iptgi-tab", "quiz");
-  if (!TABS.includes(want) || (want === "claude" && !ai)) want = "quiz";
+  let want = store.get("iptgi-tab", "practice");
+  if (!TABS.includes(want) || (want === "claude" && !ai)) want = "practice";
   setTab(want, false);
 }
 TABS.forEach(t => $("tab-" + t).onclick = () => { if (t !== "practice") stopAll(); setTab(t); });
