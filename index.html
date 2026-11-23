@@ -285,6 +285,7 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
       <button class="tool" id="pMine" disabled>내 녹음</button>
       <button class="tool" id="pCompare" disabled>번갈아 듣기</button>
     </div>
+    <button class="tool" id="pAna" disabled>녹음 분석 (녹음하면 자동으로 나와요)</button>
     <div class="result ana" id="ana" role="status" hidden>
       <span class="small">녹음 분석</span>
       <p class="focus" id="anaFocus"></p>
@@ -316,6 +317,7 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
     <h3 id="ph3">오늘 할 일 · <span id="stepCard">1강</span></h3>
     <ul class="steps" id="steps"></ul>
   </section>
+  <p class="small" id="ver" style="text-align:center"></p>
 </div>
 
 <nav class="dock">
@@ -392,6 +394,7 @@ const CARDS = [
       ["A", "Nice talking to you. See you later!", "얘기 나눠서 즐거웠어요. 나중에 봐요!"]
     ] }
 ];
+const APP_VERSION = "11.23-4 (녹음 분석)";
 
 // 5강 미션: 완성 예시를 문장 단위로
 CARDS[4].lines = [
@@ -525,7 +528,7 @@ function go(d) { const v = view(); if (!v.length) return; pos = (pos + d + v.len
 function flip() { if (!cur()) return; flipped = !flipped; render(); }
 
 /* ---------- 문장 연습: 녹음 / 비교 / 발음 확인 ---------- */
-const recs = {};               // "강-문장" → blob URL (앱을 닫으면 사라짐)
+const recs = {}, recBlobs = {};               // "강-문장" → blob URL (앱을 닫으면 사라짐)
 let recorder = null, chunks = [], player = new Audio();
 const key = () => `${cur().n}-${sel}`;
 const REC_OK = !!(navigator.mediaDevices && window.MediaRecorder);
@@ -539,7 +542,7 @@ function renderPractice(c) {
   $("tEn").textContent = ls[sel].en;
   $("tKo").textContent = ls[sel].ko;
   const has = !!recs[key()];
-  $("pMine").disabled = !has; $("pCompare").disabled = !has;
+  $("pMine").disabled = !has; $("pCompare").disabled = !has; $("pAna").disabled = !has;
   $("result").hidden = true;
   $("ana").hidden = true;
 }
@@ -582,7 +585,7 @@ $("pRec").onclick = async () => {
     if (chunks.length) {
       if (recs[k]) URL.revokeObjectURL(recs[k]);
       blob = new Blob(chunks, { type: recorder.mimeType || "audio/mp4" });
-      recs[k] = URL.createObjectURL(blob);
+      recs[k] = URL.createObjectURL(blob); recBlobs[k] = blob;
     }
     if (cur() && key() === k) {
       renderPractice(cur());
@@ -600,6 +603,7 @@ function playMine() {
     player.play().catch(() => res());
   });
 }
+$("pAna").onclick = () => { const b = recBlobs[key()]; if (b) analyze(b, target()); };
 $("pMine").onclick = () => { stopAll(); playMine(); };
 $("pCompare").onclick = async () => {
   stopAll();
@@ -1001,6 +1005,7 @@ if (!standalone) {
     ? "앱처럼 쓰려면: Safari 아래쪽 공유 버튼 → '홈 화면에 추가'를 눌러요."
     : "앱처럼 쓰려면: Chrome 오른쪽 위 ⋮ 메뉴 → '홈 화면에 추가'를 눌러요.";
 }
+$("ver").textContent = "버전 " + APP_VERSION;
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 if (!TTS) { $("pListen").disabled = true; $("pSlow").disabled = true; }
 

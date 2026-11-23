@@ -1,4 +1,4 @@
-const CACHE = "iptgi-v3";
+const CACHE = "iptgi-v4";
 const FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./icon-180.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", e => {
@@ -9,7 +9,7 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request, { cache: "no-cache" }).then(r => {
       if (r.ok && new URL(e.request.url).origin === location.origin) {
         const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy));
       }
