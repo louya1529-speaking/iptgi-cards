@@ -193,6 +193,15 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 .qverdict { font-size: 16px; font-weight: 700; margin: 0; }
 .qverdict.good { color: var(--t-review); }
 .qverdict.bad { color: var(--t-mission); }
+.focus { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.5; }
+.focus .lab { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 5px; background: var(--mark); color: var(--mark-ink); margin-right: 6px; vertical-align: 2px; }
+.metrics { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.metrics li { display: grid; grid-template-columns: 58px 1fr auto; gap: 8px; align-items: baseline; padding: 8px 0; border-top: 1px dashed var(--line); font-size: 14px; }
+.metrics li b { font-weight: 600; }
+.metrics .st { font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 5px; border: 1px solid currentColor; white-space: nowrap; }
+.metrics .st.good { color: var(--t-review); }
+.metrics .st.warn { color: var(--t-mission); }
+.metrics .st.na { color: var(--muted); }
 .say.slow { color: var(--muted); }
 </style>
 
@@ -275,6 +284,12 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
       <button class="tool rec" id="pRec">녹음</button>
       <button class="tool" id="pMine" disabled>내 녹음</button>
       <button class="tool" id="pCompare" disabled>번갈아 듣기</button>
+    </div>
+    <div class="result ana" id="ana" role="status" hidden>
+      <span class="small">녹음 분석</span>
+      <p class="focus" id="anaFocus"></p>
+      <ul class="metrics" id="anaList"></ul>
+      <span class="score">조용한 곳에서 녹음해야 잘 맞아요. 소리의 길이·쉼·높낮이로 잰 대략적인 결과예요.</span>
     </div>
     <button class="tool" id="pCheck">발음 확인 (말하면 글자로 보여줘요)</button>
     <div class="result" id="result" role="status" hidden>
@@ -416,6 +431,7 @@ function lines(c) {
 
 /* ---------- 듣기: 휴대폰 영어 음성 ---------- */
 const TTS = "speechSynthesis" in window;
+const ttsDur = {};
 let voice = null;
 function pickVoice() {
   if (!TTS) return;
@@ -432,6 +448,10 @@ function speak(list, rate) {
     list.forEach((t, i) => {
       const u = new SpeechSynthesisUtterance(t);
       u.lang = "en-US"; if (voice) u.voice = voice; u.rate = rate;
+      // 원어민 음성 길이를 기억해 두었다가 속도 분석에 써요 (보통 속도 기준으로 환산)
+      let t0 = 0;
+      u.onstart = () => { t0 = performance.now(); };
+      u.addEventListener("end", () => { if (t0) { const d = (performance.now() - t0) / 1000 * rate; if (d > 0.3) ttsDur[t] = d; } });
       if (i === list.length - 1) u.onend = u.onerror = () => res();
       speechSynthesis.speak(u);
     });
@@ -521,6 +541,7 @@ function renderPractice(c) {
   const has = !!recs[key()];
   $("pMine").disabled = !has; $("pCompare").disabled = !has;
   $("result").hidden = true;
+  $("ana").hidden = true;
 }
 $("pick").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
@@ -544,6 +565,7 @@ $("pRec").onclick = async () => {
   if (recorder && recorder.state === "recording") { recorder.stop(); return; }
   if (!REC_OK) { $("pNote").textContent = "이 브라우저는 녹음을 지원하지 않아요. Safari(아이폰)나 Chrome(갤럭시)으로 열어 주세요."; return; }
   stopAll();
+  getCtx();
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
   catch (e) { $("pNote").textContent = "마이크 사용이 허용되지 않았어요. 휴대폰 설정에서 이 브라우저의 마이크를 허용해 주세요."; return; }
@@ -555,11 +577,17 @@ $("pRec").onclick = async () => {
   recorder.onstop = () => {
     stream.getTracks().forEach(t => t.stop());
     btn.textContent = "녹음"; btn.classList.remove("on");
+    const sentence = target();
+    let blob = null;
     if (chunks.length) {
       if (recs[k]) URL.revokeObjectURL(recs[k]);
-      recs[k] = URL.createObjectURL(new Blob(chunks, { type: recorder.mimeType || "audio/mp4" }));
+      blob = new Blob(chunks, { type: recorder.mimeType || "audio/mp4" });
+      recs[k] = URL.createObjectURL(blob);
     }
-    if (cur() && key() === k) renderPractice(cur());
+    if (cur() && key() === k) {
+      renderPractice(cur());
+      if (blob) analyze(blob, sentence);
+    }
   };
   recorder.start();
   btn.textContent = "정지"; btn.classList.add("on");
@@ -579,6 +607,142 @@ $("pCompare").onclick = async () => {
   await new Promise(r => setTimeout(r, 400));
   await playMine();
 };
+
+/* ---------- 녹음 분석: 속도 · 끊김 · 문장 끝 억양 ---------- */
+let actx = null;
+function getCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!actx) actx = new AC();
+  if (actx.state === "suspended") actx.resume().catch(() => {});
+  return actx;
+}
+function decode(ctx, buf) {
+  return new Promise((res, rej) => {
+    const p = ctx.decodeAudioData(buf, res, rej);
+    if (p && p.then) p.then(res, rej);
+  });
+}
+function syllables(text) {
+  return norm(text).reduce((n, w) => n + Math.max(1, (w.replace(/e$/, "").match(/[aeiouy]+/g) || []).length), 0);
+}
+function pitchOf(x, sr) {          // 자기상관으로 목소리 높이(Hz) 추정, 없으면 0
+  const minLag = Math.floor(sr / 400), maxLag = Math.floor(sr / 75);
+  let e0 = 0; for (let i = 0; i < x.length; i++) e0 += x[i] * x[i];
+  if (e0 === 0) return 0;
+  let best = 0, bestLag = 0;
+  for (let lag = minLag; lag <= maxLag && lag < x.length / 2; lag++) {
+    let s = 0;
+    for (let i = 0; i + lag < x.length; i++) s += x[i] * x[i + lag];
+    const r = s / e0;
+    if (r > best) { best = r; bestLag = lag; }
+  }
+  return best > 0.45 ? sr / bestLag : 0;
+}
+const median = a => { if (!a.length) return 0; const b = a.slice().sort((p, q) => p - q); return b[Math.floor(b.length / 2)]; };
+
+async function analyze(blob, sentence) {
+  const box = $("ana");
+  box.hidden = false;
+  $("anaFocus").textContent = "분석하고 있어요…";
+  $("anaList").innerHTML = "";
+  try {
+    const ctx = getCtx(); if (!ctx) throw new Error("no-audio");
+    const audio = await decode(ctx, await blob.arrayBuffer());
+    // 16kHz 근처로 줄여서 계산을 가볍게
+    const raw = audio.getChannelData(0), step = Math.max(1, Math.round(audio.sampleRate / 16000));
+    const sr = audio.sampleRate / step, n = Math.floor(raw.length / step), x = new Float32Array(n);
+    for (let i = 0; i < n; i++) x[i] = raw[i * step];
+
+    // 20ms 단위 소리 크기
+    const hop = Math.round(sr * 0.02), win = Math.round(sr * 0.04);
+    const rms = [];
+    for (let s = 0; s + win <= n; s += hop) { let e = 0; for (let i = s; i < s + win; i++) e += x[i] * x[i]; rms.push(Math.sqrt(e / win)); }
+    const sorted = rms.slice().sort((a, b) => a - b);
+    const floor = sorted[Math.floor(sorted.length * 0.1)] || 0, peak = sorted[Math.floor(sorted.length * 0.98)] || 0;
+    if (peak < 0.01) throw new Error("quiet");
+    const th = Math.max(floor * 2.5, peak * 0.12);
+    const on = rms.map(v => v > th);
+    let first = on.indexOf(true), last = on.lastIndexOf(true);
+    if (first < 0) throw new Error("quiet");
+    const speechSec = (last - first + 1) * 0.02;
+
+    // 쉼(끊김): 말하는 중간에 0.3초 넘게 조용한 구간
+    const pauses = []; let run = 0, runStart = 0;
+    for (let i = first; i <= last; i++) {
+      if (!on[i]) { if (!run) runStart = i; run++; }
+      else { if (run * 0.02 >= 0.3) pauses.push({ at: (runStart - first) / (last - first + 1), len: run * 0.02 }); run = 0; }
+    }
+    const allowed = (sentence.replace(/[.!?]\s*$/, "").match(/[,.!?]/g) || []).length;
+    const extra = Math.max(0, pauses.length - allowed);
+
+    // 속도: 원어민 음성 길이(들어본 적 있으면 실측) 또는 음절 수로 추정
+    const expected = ttsDur[sentence] || (syllables(sentence) / 4.2 + 0.15);
+    const ratio = speechSec / expected;
+
+    // 억양: 말 끝부분과 가운데 부분의 목소리 높이 비교
+    const pts = [];
+    const pw = Math.round(sr * 0.04);
+    for (let f = first; f <= last; f++) {
+      if (!on[f]) continue;
+      const s = f * hop; if (s + pw > n) break;
+      const hz = pitchOf(x.subarray(s, s + pw), sr);
+      if (hz) pts.push({ t: (f - first) / (last - first + 1), hz });
+    }
+    let tune = null;
+    if (pts.length >= 8) {
+      const endPts = pts.slice(-Math.max(4, Math.round(pts.length * 0.2))).map(p => p.hz);
+      const midPts = pts.filter(p => p.t > 0.2 && p.t < 0.7).map(p => p.hz);
+      const endHz = median(endPts), midHz = median(midPts.length ? midPts : pts.map(p => p.hz));
+      tune = endHz / midHz;
+    }
+    const words = norm(sentence);
+    const isYesNo = /\?\s*$/.test(sentence) && /^(are|is|do|does|can|am|was|were|did|have|has)$/.test(words[0]);
+    const isQ = /\?\s*$/.test(sentence);
+
+    // 결과 정리
+    const M = [];
+    let speedMsg, speedSt = "good";
+    if (ratio > 1.7) { speedMsg = `원어민보다 ${ratio.toFixed(1)}배 느려요`; speedSt = "warn"; }
+    else if (ratio > 1.35) { speedMsg = `원어민보다 조금 느려요 (${ratio.toFixed(1)}배)`; speedSt = "warn"; }
+    else if (ratio < 0.7) { speedMsg = "원어민보다 빨라요. 서두르지 않아도 돼요"; speedSt = "warn"; }
+    else speedMsg = "원어민과 비슷한 속도예요";
+    M.push(["속도", speedMsg, speedSt]);
+
+    let pauseMsg, pauseSt = "good", where = "";
+    if (extra > 0) {
+      const p = pauses.slice().sort((a, b) => b.len - a.len)[0];
+      const wi = Math.min(words.length - 2, Math.max(0, Math.floor(p.at * words.length - 0.5)));
+      where = words.length > 1 ? `"${words[wi]}"와 "${words[wi + 1]}" 사이쯤` : "";
+      pauseMsg = `중간에 ${extra}번 끊겼어요${where ? ` (${where})` : ""}`; pauseSt = "warn";
+    } else pauseMsg = "끊기지 않고 한 덩어리로 말했어요";
+    M.push(["끊김", pauseMsg, pauseSt]);
+
+    let tuneMsg, tuneSt = "good";
+    if (tune === null) { tuneMsg = "목소리 높이를 재지 못했어요. 조금 더 크게 말해 보세요"; tuneSt = "na"; }
+    else if (isYesNo && tune < 1.05) { tuneMsg = "질문인데 끝이 올라가지 않았어요"; tuneSt = "warn"; }
+    else if (isYesNo) tuneMsg = "질문 끝을 잘 올렸어요";
+    else if (!isQ && tune > 1.18) { tuneMsg = "끝이 올라가서 질문처럼 들릴 수 있어요"; tuneSt = "warn"; }
+    else tuneMsg = isQ ? "의문사 질문답게 끝을 자연스럽게 내렸어요" : "문장 끝을 자연스럽게 내렸어요";
+    M.push(["억양", tuneMsg, tuneSt]);
+
+    // 고칠 곳 1개: 끊김 → 억양 → 속도 순서로 가장 중요한 것 하나
+    let focus;
+    if (pauseSt === "warn") focus = `끊김: ${where ? where.replace(/ 사이쯤$/, " 사이를 ") : "단어 사이를 "}붙여서 한 번에 말해 보세요. '천천히 듣기'로 이어지는 소리를 먼저 들어요.`;
+    else if (tuneSt === "warn" && isYesNo) focus = "억양: 질문 끝 단어를 올려서 말해 보세요. (↗)";
+    else if (tuneSt === "warn") focus = "억양: 문장 끝을 내려서 말해 보세요. (↘)";
+    else if (speedSt === "warn" && ratio > 1) focus = "속도: '듣기'를 들은 직후, 같은 빠르기로 바로 따라 말해 보세요.";
+    else if (speedSt === "warn") focus = "속도: 조금 천천히, 단어를 또렷하게 말해 보세요.";
+    else focus = "아주 좋아요! 이제 '발음 확인'으로 단어가 정확히 들리는지 확인해 보세요.";
+
+    $("anaFocus").innerHTML = `<span class="lab">고칠 곳 1개</span>${esc(focus)}`;
+    $("anaList").innerHTML = M.map(m => `<li><b>${m[0]}</b><span>${esc(m[1])}</span><span class="st ${m[2]}">${m[2] === "good" ? "좋아요" : m[2] === "warn" ? "고치기" : "측정 안 됨"}</span></li>`).join("");
+  } catch (e) {
+    $("anaFocus").textContent = e.message === "quiet"
+      ? "소리가 너무 작아요. 휴대폰을 입 가까이 대고 다시 녹음해 보세요."
+      : "이 브라우저에서는 녹음 분석이 안 돼요. Chrome에서 열어 보세요.";
+  }
+}
 
 /* 발음 확인: 휴대폰 음성 인식으로 받아쓰고 정답과 단어 비교 */
 const norm = s => s.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]/g, " ").split(/\s+/).filter(Boolean);
