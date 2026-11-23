@@ -245,6 +245,13 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 .pick button.full { padding: 0 12px; font-family: var(--f-body); font-weight: 600; }
 .tabs.two { grid-template-columns: repeat(2, 1fr); }
 .tabs button[hidden] { display: none; }
+
+.weeks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.wk { font: inherit; font-size: 14px; font-weight: 600; height: 46px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; }
+.wk span { font-family: var(--f-mono); font-size: 11px; font-weight: 500; color: var(--muted); }
+.wk[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.wk[aria-pressed="true"] span { color: var(--paper); opacity: .75; }
+.items[hidden] { display: none; }
 </style>
 
 </head>
@@ -261,10 +268,11 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 <div class="wrap">
   <header>
     <div class="top">
-      <h1>입트기 학습카드 · Week 1</h1>
-      <span class="prog" id="prog">외운 카드 0/6</span>
+      <h1>입트기 학습카드 · Part 1</h1>
+      <span class="prog" id="prog">외운 카드 0/24</span>
     </div>
     <div class="bar"><i id="barFill"></i></div>
+    <div class="weeks" id="weeks" aria-label="주차 고르기"></div>
     <div class="dots" id="dots" aria-label="카드 목록"></div>
     <div class="tools">
       <button class="chip" id="onlyLeft" aria-pressed="false">안 외운 카드만</button>
@@ -469,8 +477,202 @@ const CARDS = [
       ["B", "Oh, really? Me too!", "오, 그래요? 저도요!"],
       ["A", "Nice talking to you. See you later!", "얘기 나눠서 즐거웠어요. 나중에 봐요!"]
     ] }
+  ,
+  { n: 7, type: "lesson", title: "진짜 기분은 이렇게 말해요",
+    items: [
+      ["어떻게 지내요?", "How are you?", "안부 인사. 답을 기대하는 질문이에요"],
+      ["아주 좋아요!", "I'm great!", "기분 최고일 때"],
+      ["좋아요. 당신은요?", "I'm good. How about you?", "4강 복습 + 되묻기"],
+      ["나쁘지 않아요.", "Not bad.", "평범한 날. 부정적인 뜻이 아니에요"],
+      ["별로예요.", "Not so good.", "기분이 안 좋을 때. 친한 사이에서"]
+    ] },
+  { n: 8, type: "lesson", title: "배고파, 피곤해, 설레! 기분 단어 10개",
+    items: [
+      ["너무 배고파요.", "I'm so hungry.", "I'm + so + 기분 단어"],
+      ["정말 피곤해요.", "I'm really tired.", "so 대신 really도 같은 뜻"],
+      ["조금 긴장돼요.", "I'm a little nervous.", "a little로 부드럽게"],
+      ["오늘 너무 행복해요.", "I'm so happy today.", "today는 문장 끝에"],
+      ["오늘 바빠요.", "I'm busy today.", "약속을 거절할 때도 써요"]
+    ],
+    extra: "기분 단어 10: hungry 배고픈 · full 배부른 · tired 피곤한 · sleepy 졸린 · sick 아픈 · happy 행복한 · sad 슬픈 · excited 신나는 · nervous 긴장되는 · busy 바쁜" },
+  { n: 9, type: "lesson", title: "\"괜찮아?\" 한마디로 마음 여는 법",
+    items: [
+      ["괜찮아요?", "Are you okay?", "상대 표정이 안 좋을 때"],
+      ["아파요?", "Are you sick?", "Are you + 기분 단어"],
+      ["피곤해 보여요.", "You look tired.", "You look + 기분 단어 = ~해 보여요"],
+      ["오늘 행복해 보여요!", "You look happy today!", "기분 좋은 말에도 써요"],
+      ["무슨 일 있어요?", "What's wrong?", "친한 사이에서", true]
+    ] },
+  { n: 10, type: "pron", title: "같은 말도 억양 하나로 느낌이 달라져요",
+    items: [
+      ["정말요? (놀라서)", "Really? ↗", "끝을 올려요. 내리면 시큰둥하게 들려요"],
+      ["잘됐다! (진심으로 기뻐서)", "That's great!", "높게 시작해서 크게"],
+      ["아, 그렇구나. (알겠어요)", "Oh, I see. ↘", "끝을 내려요"],
+      ["괜찮아요? (걱정돼서)", "Are you okay? ↗", "낮고 부드럽게, 끝은 올려요"],
+      ["정말 고마워요. (크게 감사)", "Thank you <mark>so</mark> much.", "so를 길고 세게"]
+    ],
+    extra: "강조할 단어는 더 길게, 더 높게, 더 크게 말해요." },
+  { n: 11, type: "mission", title: "오늘 내 기분, 영어로 30초 말하기",
+    script: [
+      "How are you?",
+      "I'm <span class='blank'></span> <span class='opt'>(great / good / okay)</span>.",
+      "I'm so <span class='blank'></span> <span class='opt'>(hungry / tired / sleepy / happy)</span>.",
+      "I'm a little <span class='blank'></span> <span class='opt'>(nervous / busy / sad)</span>.",
+      "But it's okay!",
+      "This is my friend <span class='blank'></span>.",
+      "She's / He's <span class='blank'></span> <span class='opt'>(busy / happy / tired)</span> today.",
+      "How about you?"
+    ],
+    extra: "도움 표현: but 하지만 · This is my friend ~ 이쪽은 제 친구 ~예요",
+    example: "How are you? I'm good. I'm so hungry. I'm a little busy. But it's okay! This is my friend Jisu. She's happy today. How about you?",
+    trans: "어떻게 지내요? 저는 좋아요. 너무 배고파요. 조금 바빠요. 하지만 괜찮아요! 이쪽은 제 친구 지수예요. 오늘 행복해요. 당신은요?",
+    lines: [
+      ["How are you?", "어떻게 지내요?"], ["I'm good.", "저는 좋아요."], ["I'm so hungry.", "너무 배고파요."],
+      ["I'm a little busy.", "조금 바빠요."], ["But it's okay!", "하지만 괜찮아요!"],
+      ["This is my friend Jisu.", "이쪽은 제 친구 지수예요."], ["She's happy today.", "그녀는 오늘 행복해요."], ["How about you?", "당신은요?"]
+    ] },
+  { n: 12, type: "review", title: "힘든 친구에게 영어로 위로 건네기",
+    items: [
+      ["그 말 들으니 마음이 안 좋네요.", "I'm sorry to hear that.", "사과가 아니라 안타까움", true],
+      ["안됐네요.", "That's too bad.", "가벼운 안타까움"],
+      ["걱정 마세요.", "Don't worry.", "상대가 불안해할 때"],
+      ["괜찮아요.", "It's okay.", "4강 복습"],
+      ["힘내요!", "Cheer up!", "친구를 응원할 때"]
+    ],
+    dialog: [
+      ["A", "Are you okay? You look tired.", "괜찮아요? 피곤해 보여요."],
+      ["B", "I'm so tired. I'm a little sick.", "너무 피곤해요. 조금 아파요."],
+      ["A", "Oh, I'm sorry to hear that. Don't worry. Cheer up!", "아, 마음이 안 좋네요. 걱정 마요. 힘내요!"],
+      ["B", "Thank you so much.", "정말 고마워요."]
+    ] },
+  { n: 13, type: "lesson", title: "눈앞에 있는 건 전부 영어로! this, that",
+    items: [
+      ["이건 제 폰이에요.", "This is my phone.", "가까이 있는 것 하나"],
+      ["이건 뭐예요?", "What's this?", "What's = What is. 답은 It's ~"],
+      ["저건 뭐예요?", "What's that?", "멀리 있는 것을 가리킬 때"],
+      ["이쪽은 제 친구 지수예요.", "This is my friend, Jisu.", "사람을 소개할 때도 This is ~"],
+      ["저건 제 가방이에요.", "That's my bag.", "That's = That is"]
+    ] },
+  { n: 14, type: "lesson", title: "(필수) 한국인이 제일 많이 틀리는 a, an, the",
+    items: [
+      ["고양이예요.", "It's a cat.", "규칙 ①: 처음 말하는 하나 → a"],
+      ["사과예요.", "It's an apple.", "규칙 ②: 모음 소리 [애]로 시작 → an"],
+      ["그 고양이 정말 귀여워요.", "The cat is so cute.", "규칙 ③: 방금 말한 그 고양이 → the"],
+      ["저는 회사원이에요.", "I'm an office worker.", "2강 복습. 직업 앞에도 a/an"],
+      ["문 좀 열어 주세요.", "Open the door, please.", "규칙 ③: 둘 다 아는 그 문. please는 부탁할 때"]
+    ],
+    extra: "규칙 3개: ① 하나를 처음 말할 때 a ② 모음 소리 앞은 an ③ 서로 아는 것은 the" },
+  { n: 15, type: "lesson", title: "여러 개면 그냥 s만 붙이면 될까요?",
+    items: [
+      ["그들은 제 친구들이에요.", "They're my friends.", "여럿이면 They're + 단어 끝에 s"],
+      ["이것들은 제 책이에요.", "These are my books.", "여러 개를 가리킬 땐 this → these"],
+      ["커피 두 잔 주세요.", "Two coffees, please.", "카페에서 바로 쓰는 문장"],
+      ["우리 아이들은 정말 귀여워요.", "My children are so cute.", "child → children (모양이 바뀌는 단어)"],
+      ["저 사람들은 제 동료들이에요.", "Those people are my coworkers.", "person → people. 멀리 있는 여럿은 those"]
+    ],
+    extra: "모양이 바뀌는 단어 3개: person → people · child → children · man → men" },
+  { n: 16, type: "pron", title: "끝소리 s 하나로 영어가 달라 들려요",
+    items: [
+      ["이것들은 제 책이에요.", "These are my book<mark>s</mark>.", "[s] 바람 소리만. k, p, t 뒤"],
+      ["고양이들이에요.", "They're cat<mark>s</mark>.", "[s] \"캐츠\"가 아니라 \"캣ㅅ\""],
+      ["그들은 제 친구들이에요.", "They're my friend<mark>s</mark>.", "[z] 목이 울려요. 대부분 이 소리"],
+      ["개 두 마리요.", "Two dog<mark>s</mark>, please.", "[z] dogs = [독ㅈ]"],
+      ["이건 제 안경이에요.", "These are my glass<mark>es</mark>.", "[이즈] 소리 하나 더. 안경은 항상 glasses"]
+    ],
+    extra: "목에 손을 대고 [z]에서 떨림을 느껴 보세요. 끝소리 s를 빼먹지 않기." },
+  { n: 17, type: "lesson", title: "가족, 물건 다 소개하는 만능 동사 Have",
+    items: [
+      ["개를 키워요.", "I have a dog.", "반려동물도 have"],
+      ["형제가 둘 있어요.", "I have two brothers.", "15강 복수 s 복습"],
+      ["형제자매 있어요?", "Do you have brothers or sisters?", "답: Yes, I do. / No, I don't."],
+      ["그녀는 고양이가 있어요.", "She has a cat.", "He/She일 때만 has"],
+      ["질문이 있어요.", "I have a question.", "수업·회의·가게에서", true]
+    ],
+    extra: "가족 단어: mom 엄마 · dad 아빠 · brother 형제 · sister 자매 · husband 남편 · wife 아내 · son 아들 · daughter 딸" },
+  { n: 18, type: "mission", title: "가족 사진 보여주며 영어로 소개하기",
+    script: [
+      "This is my <span class='blank'></span> <span class='opt'>(mom / dad / husband / wife)</span>.",
+      "She's / He's a(n) <span class='blank'></span> <span class='opt'>(teacher / nurse / office worker)</span>.",
+      "She's / He's really nice.",
+      "These are my <span class='blank'></span> <span class='opt'>(sons / daughters / sisters)</span>.",
+      "They're so <span class='blank'></span> <span class='opt'>(cute / busy)</span>.",
+      "I have a <span class='blank'></span> <span class='opt'>(dog / cat)</span>.",
+      "The <span class='blank'></span> is so cute."
+    ],
+    example: "This is my mom. She's a teacher. She's really nice. These are my daughters. They're so cute. I have a dog. The dog is so cute.",
+    trans: "이분은 저희 엄마예요. 선생님이에요. 정말 친절해요. 이 아이들은 제 딸들이에요. 정말 귀여워요. 개도 한 마리 있어요. 그 개는 정말 귀여워요.",
+    lines: [
+      ["This is my mom.", "이분은 저희 엄마예요."], ["She's a teacher.", "선생님이에요."], ["She's really nice.", "정말 친절해요."],
+      ["These are my daughters.", "이 아이들은 제 딸들이에요."], ["They're so cute.", "정말 귀여워요."],
+      ["I have a dog.", "개도 한 마리 있어요."], ["The dog is so cute.", "그 개는 정말 귀여워요."]
+    ] },
+  { n: 19, type: "lesson", title: "What, Who, Where, How 질문 4개면 대화가 시작돼요",
+    items: [
+      ["이름이 뭐예요?", "What's your name?", "What = 무엇. 답은 I'm ~"],
+      ["무슨 일 해요?", "What do you do?", "직업을 물을 때. 답은 I'm a(n) ~", true],
+      ["저 사람은 누구예요?", "Who's that?", "Who = 누구. 사진을 보며"],
+      ["화장실이 어디예요?", "Where's the bathroom?", "Where = 어디. 여행에서 바로 써요"],
+      ["가족들은 잘 지내요?", "How's your family?", "How = 어떻게. 아는 사람에게 안부"]
+    ],
+    extra: "의문사 질문은 끝을 내려요 ↘" },
+  { n: 20, type: "lesson", title: "나이 물어보면 당황하셨죠? 영어 숫자",
+    items: [
+      ["몇 살이에요?", "How old are you?", "처음 본 어른에게는 잘 묻지 않아요"],
+      ["서른두 살이에요.", "I'm thirty-two.", "만 나이로. I'm + 숫자"],
+      ["얼마예요?", "How much is it?", "가게에서 가격을 물을 때"],
+      ["25달러예요.", "It's twenty-five dollars.", "원화는 won (25,000 won = twenty-five thousand won)"],
+      ["제 번호는 010-1234-5678이에요.", "My number is oh-one-oh, one-two-three-four, five-six-seven-eight.", "한 자리씩 읽고, 0은 oh"]
+    ],
+    extra: "숫자: one two three four five six seven eight nine ten · 20 twenty · 30 thirty · 40 forty · 50 fifty · 25 twenty-five" },
+  { n: 21, type: "lesson", title: "날짜, 요일 이제 안 헷갈리게",
+    items: [
+      ["오늘 무슨 요일이에요?", "What day is it today?", "day = 요일"],
+      ["일요일이에요.", "It's Sunday.", "요일은 대문자로 시작"],
+      ["오늘 며칠이에요?", "What's the date today?", "date = 날짜"],
+      ["11월 22일이에요.", "It's November twenty-second.", "날짜는 순서 숫자 (22nd)"],
+      ["제 생일은 5월 3일이에요.", "My birthday is May third.", "내 생일로 바꿔 외우기"]
+    ],
+    extra: "요일: Monday 월 · Tuesday 화 · Wednesday 수 · Thursday 목 · Friday 금 · Saturday 토 · Sunday 일 · 날짜: 1일 first, 2일 second, 3일 third, 4일부터 + th" },
+  { n: 22, type: "lesson", title: "\"몇 시예요?\" 시간 묻고 답하기",
+    items: [
+      ["몇 시예요?", "What time is it?", "모르는 사람에게는 Excuse me를 앞에"],
+      ["7시 30분이에요.", "It's seven thirty.", "시 + 분 순서로 숫자만 읽어요"],
+      ["8시 45분이에요.", "It's eight forty-five.", "같은 방법으로"],
+      ["10시 정각이에요.", "It's ten o'clock.", "정각일 때만 o'clock"],
+      ["6시에 봐요!", "See you at six!", "시각 앞에 at. 1강 See you later 활용"]
+    ] },
+  { n: 23, type: "pron", title: "thirteen vs thirty 절대 안 헷갈리게",
+    items: [
+      ["제 아들은 13살이에요.", "My son is thir<mark>TEEN</mark>.", "뒷부분 \"틴~\"을 길고 세게"],
+      ["30달러예요.", "It's <mark>THIR</mark>ty dollars.", "앞부분을 세게, 끝은 짧게"],
+      ["15예요, 50이에요?", "Fifteen or fifty?", "fifTEEN / FIFty 대비. 헷갈릴 때 확인 질문"],
+      ["14달러예요.", "It's four<mark>TEEN</mark> dollars.", "14"],
+      ["그녀는 40살이에요.", "She's <mark>FOR</mark>ty.", "40"]
+    ],
+    extra: "13~19(-teen)는 뒤를 세게, 30~90(-ty)은 앞을 세게. 못 알아들으면 \"one, three\"처럼 한 자리씩." },
+  { n: 24, type: "review", title: "처음 보는 외국인과 5분 대화하기",
+    items: [],
+    dialog: [
+      ["A", "Hi, nice to meet you. I'm Minji. What's your name?", "안녕하세요, 만나서 반가워요. 저는 민지예요. 이름이 뭐예요?"],
+      ["B", "I'm Tom. Nice to meet you, too.", "저는 톰이에요. 저도 만나서 반가워요."],
+      ["A", "How are you?", "어떻게 지내요?"],
+      ["B", "I'm good. How about you?", "좋아요. 당신은요?"],
+      ["A", "I'm great! Where are you from?", "아주 좋아요! 어디서 왔어요?"],
+      ["B", "I'm from Canada. What about you?", "캐나다에서 왔어요. 당신은요?"],
+      ["A", "I'm from Seoul. What do you do?", "서울에서 왔어요. 무슨 일 해요?"],
+      ["B", "I'm a teacher.", "선생님이에요."],
+      ["A", "Oh, really? My mom is a teacher, too!", "오, 그래요? 저희 엄마도 선생님이에요!"],
+      ["B", "That's great! Do you have brothers or sisters?", "잘됐네요! 형제자매 있어요?"],
+      ["A", "Yes, I do. I have two brothers.", "네. 형제가 둘 있어요."],
+      ["B", "Oh, I see. What time is it?", "아, 그렇군요. 몇 시예요?"],
+      ["A", "It's seven thirty.", "7시 30분이에요."],
+      ["B", "Oh, I'm busy today. Nice talking to you!", "아, 오늘 바빠요. 얘기 나눠서 즐거웠어요!"],
+      ["A", "Nice talking to you. See you later!", "저도 즐거웠어요. 나중에 봐요!"]
+    ] }
 ];
-const APP_VERSION = "11.23-9 (AI 연습 정리)";
+CARDS.forEach(c => { c.w = Math.ceil(c.n / 6); });
+
+const APP_VERSION = "11.23-10 (Part 1 전체)";
 const MIC_ICON = '<svg><use href="#i-mic"/></svg>';
 const REC_LABEL = "녹음 시작";
 
@@ -486,7 +688,7 @@ CARDS[4].lines = [
 
 const TYPE = { lesson: "핵심", pron: "발음특강", mission: "실전미션", review: "복습" };
 const $ = id => document.getElementById(id);
-const strip = s => s.replace(/<[^>]+>/g, "");
+const strip = s => s.replace(/<[^>]+>/g, "").replace(/[↗↘]/g, "").trim();
 const esc = s => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -499,7 +701,10 @@ let order = CARDS.map((_, i) => i);
 let onlyLeft = false, shuffled = false, pos = 0, flipped = false, sel = 0;
 const card = $("card"), front = $("front"), back = $("back");
 
-const view = () => onlyLeft ? order.filter(i => !known.has(CARDS[i].n)) : order;
+let week = store.get("iptgi-week", 1);
+const WEEKS = [...new Set(CARDS.map(c => c.w))];
+if (!WEEKS.includes(week)) week = 1;
+const view = () => order.filter(i => CARDS[i].w === week && (!onlyLeft || !known.has(CARDS[i].n)));
 const cur = () => { const v = view(); return v.length ? CARDS[v[pos]] : null; };
 
 /* ---------- 연습 문장 목록 ---------- */
@@ -557,6 +762,7 @@ function renderCard(c) {
     front.innerHTML = head(c, "앞면") +
       `<p class="inst">빈칸을 내 정보로 채워 소리 내어 말해 보세요. 괄호 안 보기에서 골라도 돼요.</p>
        <div class="script">${c.script.join("<br>")}</div>
+       ${c.extra ? `<p class="note">${c.extra}</p>` : ""}
        <p class="hint">탭해서 완성 예시 보기</p>`;
     back.innerHTML = head(c, "뒷면") +
       `<p class="inst">완성 예시</p>
@@ -567,12 +773,12 @@ function renderCard(c) {
     return;
   }
   front.innerHTML = head(c, "앞면") +
-    `<p class="inst">한국어를 보고 2초 안에 영어로 말해 보세요.</p>
-     <ol class="items">${c.items.map(it => `<li><span class="ko">${it[0]}</span></li>`).join("")}</ol>
+    (c.items.length ? `<p class="inst">한국어를 보고 2초 안에 영어로 말해 보세요.</p>
+     <ol class="items">${c.items.map(it => `<li><span class="ko">${it[0]}</span></li>`).join("")}</ol>` : "") + `
      ${c.dialog ? `<p class="inst">예시 대화 · 한국어를 보고 A, B를 번갈아 말해 보세요</p><div class="dialog">${c.dialog.map(d => `<p><b>${d[0]}</b><span>${d[2]}</span></p>`).join("")}</div>` : ""}
      <p class="hint">탭해서 정답 보기</p>`;
   back.innerHTML = head(c, "뒷면") +
-    `<ol class="items">${c.items.map(it => `<li><span class="en">${it[1]}${it[3] ? '<span class="tag">통문장</span>' : ""}</span><span class="sub">${it[0]}</span><span class="note">${it[2]}</span>${sayBtns(it[1])}</li>`).join("")}</ol>
+    (c.items.length ? "" : "") + `<ol class="items"${c.items.length ? "" : " hidden"}>${c.items.map(it => `<li><span class="en">${it[1]}${it[3] ? '<span class="tag">통문장</span>' : ""}</span><span class="sub">${it[0]}</span><span class="note">${it[2]}</span>${sayBtns(it[1])}</li>`).join("")}</ol>
      ${c.extra ? `<p class="note">${c.extra}</p>` : ""}
      ${c.dialog ? `<p class="inst">예시 대화</p><div class="dialog">${c.dialog.map(d => `<p><b>${d[0]}</b><span><span class="en" style="font-size:16px">${d[1]}</span><br>${sayBtns(d[1])}</span></p>`).join("")}</div>` : ""}`;
 }
@@ -598,7 +804,11 @@ function render() {
 }
 function renderDots() {
   const c = cur();
-  $("dots").innerHTML = CARDS.map(x =>
+  $("weeks").innerHTML = WEEKS.map(w => {
+    const ws = CARDS.filter(x => x.w === w), k = ws.filter(x => known.has(x.n)).length;
+    return `<button class="wk" aria-pressed="${w === week}" data-w="${w}">${w}주차<span>${k}/${ws.length}</span></button>`;
+  }).join("");
+  $("dots").innerHTML = CARDS.filter(x => x.w === week).map(x =>
     `<button class="dot${known.has(x.n) ? " known" : ""}${c && x.n === c.n ? " cur" : ""}" data-n="${x.n}">${x.n}강</button>`).join("");
   $("prog").textContent = `외운 카드 ${known.size}/${CARDS.length}`;
   $("barFill").style.width = (known.size / CARDS.length * 100) + "%";
@@ -847,8 +1057,25 @@ async function analyze(blob, sentence, k, isFull) {
 const norm = s => s.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]/g, " ").split(/\s+/).filter(Boolean);
 const NUM = { zero:"0", oh:"0", one:"1", two:"2", three:"3", four:"4", five:"5", six:"6", seven:"7", eight:"8", nine:"9", ten:"10" };
 const canon = w => NUM[w] || w;
+const ONES = ["zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen"];
+const TENS = ["","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"];
+const ORD = { one:"first", two:"second", three:"third", five:"fifth", eight:"eighth", nine:"ninth", twelve:"twelfth" };
+function numWords(n) { return n < 20 ? [ONES[n]] : [TENS[Math.floor(n / 10)]].concat(n % 10 ? [ONES[n % 10]] : []); }
+function heardWords(said) {   // "25", "7:30", "22nd", "010"도 단어로 바꿔서 비교
+  const out = /\$/.test(said) ? ["dollars"] : [];
+  norm(said).forEach(w => {
+    out.push(w);
+    const m = w.match(/^(\d+)(st|nd|rd|th)?$/); if (!m) return;
+    const n = +m[1];
+    if (m[1].length > 1 && m[1][0] === "0" || m[1].length > 2) { out.push(...m[1].split("")); return; }
+    const ws = numWords(n);
+    if (m[2]) { const last = ws.pop(); ws.push(ORD[last] || (last.endsWith("y") ? last.slice(0, -1) + "ieth" : last.replace(/e$/, "") + "th")); }
+    out.push(...ws);
+  });
+  return out;
+}
 function compare(said, want) {
-  const heard = new Set(norm(said).map(canon));
+  const heard = new Set(heardWords(said).map(canon));
   // 줄임말은 풀어쓴 형태로 들려도 인정 (I'm ↔ I am)
   const expand = { "i'm": ["i", "am"], "you're": ["you", "are"], "he's": ["he", "is"], "she's": ["she", "is"], "it's": ["it", "is"], "we're": ["we", "are"], "what's": ["what", "is"], "how's": ["how", "is"], "that's": ["that", "is"] };
   return norm(want).map(w => {
@@ -1033,6 +1260,14 @@ $("qRestart").onclick = () => quizStart(lines(cur()).filter(l => !l.full));
 const CLAUDE = {
   5: { desc: "Claude 음성 모드에서 아래 문장을 읽고 내 자기소개를 말해 보세요. 알아듣기 어려웠던 부분을 알려줘요.",
        text: "나는 영어 왕초보야. 지금부터 영어로 30초 자기소개를 할게. 다 들으면 네가 들은 문장을 글자 그대로 다시 말해주고, 알아듣기 어려웠던 단어와 더 자연스럽게 고칠 문장을 딱 하나씩만 쉬운 한국어로 알려줘." },
+  11: { desc: "Claude 음성 모드에서 아래 문장을 읽고 오늘 내 기분을 30초 동안 말해 보세요. 알아듣기 어려웠던 부분과 고칠 문장을 알려줘요.",
+        text: "나는 영어 왕초보야. 지금부터 영어로 오늘 내 기분을 30초 동안 말할게. 다 들으면 네가 들은 문장을 글자 그대로 다시 말해주고, 알아듣기 어려웠던 단어와 더 자연스럽게 고칠 문장을 딱 하나씩만 쉬운 한국어로 알려줘. 그다음 How about you?에 대한 너의 대답을 아주 쉬운 영어로 한두 문장만 해줘." },
+  12: { desc: "예시 대화를 외운 뒤 'Claude에서 열기'를 누르면 위로하기 상황극이 시작돼요. 두 번째에는 Amy의 기분을 바꿔 달라고 해요.",
+        text: "상황극 하자. 너는 내 친구 Amy인데 오늘 피곤하고 조금 아파. 나는 영어 왕초보야. 내가 먼저 Are you okay?라고 물어볼게. 짧고 쉬운 문장으로 한 번에 한 문장씩 대답해줘. 끝나면 내가 쓴 위로 표현 중 잘한 점 하나와 고칠 점 하나를 알려줘." },
+  18: { desc: "가족 사진을 보면서 Claude 음성 모드에서 아래 문장을 읽고 가족을 소개해 보세요. Claude가 가족에 대해 쉬운 질문도 해줘요.",
+        text: "나는 영어 왕초보야. 지금부터 가족 사진을 보면서 영어로 30초 동안 가족을 소개할게. 다 들으면 네가 들은 문장을 글자 그대로 다시 말해주고, 고칠 문장을 딱 하나만 쉬운 한국어로 알려줘. 그다음 내 가족에 대해 Do you have ~? 또는 What do you do? 같은 아주 쉬운 질문을 하나만 해줘." },
+  24: { desc: "예시 대화를 외운 뒤 'Claude에서 열기'를 누르면 5분 상황극이 시작돼요. 끝나면 Claude가 알려준 고칠 문장 3개를 다시 암기해요.",
+        text: "5분 상황극 하자. 너는 카페에서 처음 만난 외국인이야. 나는 영어 왕초보라서 인사, 기분, 출신, 직업, 가족, 시간에 대한 쉬운 질문만 해줘. 한 번에 한 문장씩 말해줘. 내가 대답을 못 하면 내가 쓸 수 있는 문장을 힌트로 줘. 끝나면 잘한 점 하나와 고칠 문장 세 개를 알려줘." },
   6: { desc: "예시 대화를 외운 뒤, Claude 음성 모드에서 아래 문장을 읽으면 상황극이 시작돼요. 끝나면 역할을 바꿔 한 번 더 해요.",
        text: "상황극 하자. 너는 한국에 처음 온 캐나다 사람 Tom이야. 나는 영어 왕초보라서 아주 쉬운 문장만 써줘. 네가 먼저 Hi로 시작하고, 나한테 이름, 출신, 직업을 물어봐. 한 번에 한 문장씩만 말해줘. 끝나면 내가 틀린 문장을 쉬운 문장으로 고쳐줘." }
 };
@@ -1121,6 +1356,11 @@ $("know").onclick = () => {
   if (onlyLeft) flipped = false;
   render();
 };
+$("weeks").addEventListener("click", e => {
+  const b = e.target.closest(".wk"); if (!b) return;
+  week = +b.dataset.w; store.set("iptgi-week", week);
+  pos = 0; flipped = false; sel = 0; stopAll(); render();
+});
 $("dots").addEventListener("click", e => {
   const b = e.target.closest(".dot"); if (!b) return;
   const n = +b.dataset.n;
