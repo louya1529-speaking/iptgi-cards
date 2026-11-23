@@ -203,10 +203,57 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 .metrics .st.warn { color: var(--t-mission); }
 .metrics .st.na { color: var(--muted); }
 .say.slow { color: var(--muted); }
+
+/* ---- UI 정리: 탭, 3단계 연습, 오늘 할 일 ---- */
+.tool svg, .tabs svg { width: 18px; height: 18px; vertical-align: -3px; margin-right: 6px; flex: none; }
+.tool { display: inline-flex; align-items: center; justify-content: center; }
+.tool.big { height: 52px; font-size: 16px; }
+.panel h3 { font-size: 16px; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; background: var(--line); border-radius: 14px; }
+.tabs button {
+  font: inherit; font-size: 15px; font-weight: 600; height: 44px; border: 0; border-radius: 10px;
+  background: transparent; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.tabs button[aria-selected="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.panel[hidden] { display: none; }
+
+.stage { border: 1px solid var(--line); border-left: 5px solid var(--sc); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.s-listen { --sc: var(--accent); }
+.s-rec { --sc: var(--t-mission); }
+.s-check { --sc: var(--t-review); }
+.stage-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--sc); }
+.stage-h svg { width: 20px; height: 20px; }
+.stage-h b { color: var(--ink); font-size: 16px; }
+.stage-d { color: var(--muted); font-size: 13px; margin-left: auto; }
+.badge { width: 22px; height: 22px; border-radius: 50%; background: var(--sc); color: var(--card); font-family: var(--f-mono); font-size: 13px; font-weight: 600; display: inline-grid; place-items: center; }
+.stage .tool.fill { background: var(--sc); color: var(--card); border-color: transparent; }
+.stage .tool.fill.on { animation: pulse 1s infinite; }
+.foot { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+
+.today { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 0 16px; }
+.today summary { list-style: none; display: flex; align-items: center; gap: 10px; min-height: 48px; cursor: pointer; }
+.today summary::-webkit-details-marker { display: none; }
+.today summary::after { content: "▾"; color: var(--muted); font-size: 13px; }
+.today[open] summary::after { content: "▴"; }
+.today-t { font-weight: 600; font-size: 15px; }
+.pips { display: flex; gap: 4px; margin-left: auto; }
+.pips i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; }
+.pips i.on { background: var(--t-review); }
+.today-n { font-family: var(--f-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.today .steps { padding-bottom: 10px; }
 </style>
 
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-ear" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a4.5 4.5 0 0 1 0 7M18.5 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-quiz" viewBox="0 0 24 24"><path d="M5 4h14v12H9l-4 4V4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M10 8.5a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.2M12 13.6v.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-practice" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-claude" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+</svg>
+
 <div class="wrap">
   <header>
     <div class="top">
@@ -230,11 +277,27 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
     </div>
   </div>
 
-  <section class="panel" aria-labelledby="pq">
-    <h3 id="pq">즉답 퀴즈 · 한국어를 보고 영어로 말하기</h3>
+  <details class="today" id="today">
+    <summary>
+      <span class="today-t">오늘 할 일 · <span id="stepCard">1강</span></span>
+      <span class="pips" id="pips" aria-hidden="true"></span>
+      <span class="today-n" id="todayN">0/5</span>
+    </summary>
+    <ul class="steps" id="steps"></ul>
+  </details>
+
+  <div class="tabs" role="tablist" aria-label="연습 방법">
+    <button role="tab" id="tab-quiz" aria-controls="pane-quiz" aria-selected="true"><svg><use href="#i-quiz"/></svg>퀴즈</button>
+    <button role="tab" id="tab-practice" aria-controls="pane-practice" aria-selected="false"><svg><use href="#i-practice"/></svg>문장 연습</button>
+    <button role="tab" id="tab-claude" aria-controls="pane-claude" aria-selected="false"><svg><use href="#i-claude"/></svg>Claude</button>
+  </div>
+
+  <!-- 퀴즈 -->
+  <section class="panel" role="tabpanel" id="pane-quiz" aria-labelledby="tab-quiz">
     <div id="qIdle">
-      <p class="small" id="qIntro">이 카드 문장이 순서를 섞어 하나씩 나와요. 영어로 말하면 앱이 채점하고, 틀린 문장은 끝에 다시 나와요.</p>
-      <button class="tool accent" id="qStart">퀴즈 시작</button>
+      <h3>한국어를 보고 영어로 말하기</h3>
+      <p class="small" id="qIntro"></p>
+      <button class="tool accent big" id="qStart">퀴즈 시작</button>
     </div>
     <div id="qRun" hidden>
       <div class="qhead"><span class="score" id="qCount"></span><button class="chip" id="qQuit">그만하기</button></div>
@@ -243,8 +306,8 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
         <span class="en" id="qAns" hidden></span>
       </div>
       <div class="grid2" id="qAsk">
-        <button class="tool rec" id="qSpeak">말하기</button>
-        <button class="tool" id="qReveal">모르겠어요 · 정답 보기</button>
+        <button class="tool rec" id="qSpeak"><svg><use href="#i-mic"/></svg>말하기</button>
+        <button class="tool" id="qReveal">모르겠어요</button>
       </div>
       <div class="result" id="qRes" hidden>
         <span class="qverdict" id="qVerdict"></span>
@@ -256,7 +319,7 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
         <button class="tool" id="qBad">틀렸어요</button>
       </div>
       <div class="grid2" id="qAfter" hidden>
-        <button class="tool" id="qAgain">정답 다시 듣기</button>
+        <button class="tool" id="qAgain"><svg><use href="#i-ear"/></svg>다시 듣기</button>
         <button class="tool accent" id="qNext">다음 문제</button>
       </div>
     </div>
@@ -269,55 +332,63 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
     </div>
   </section>
 
-  <section class="panel" aria-labelledby="pp">
-    <h3 id="pp">문장 연습 · 듣고, 녹음하고, 확인하기</h3>
+  <!-- 문장 연습 -->
+  <section class="panel" role="tabpanel" id="pane-practice" aria-labelledby="tab-practice" hidden>
     <div class="pick" id="pick" aria-label="연습할 문장 고르기"></div>
     <div class="target">
       <span class="en" id="tEn"></span>
       <span class="sub" id="tKo"></span>
     </div>
-    <div class="grid2">
-      <button class="tool accent" id="pListen">듣기</button>
-      <button class="tool" id="pSlow">천천히 듣기</button>
+
+    <div class="stage s-listen">
+      <div class="stage-h"><span class="badge">1</span><svg><use href="#i-ear"/></svg><b>듣기</b><span class="stage-d">원어민 음성을 3번 듣기</span></div>
+      <div class="grid2">
+        <button class="tool fill" id="pListen">보통 속도</button>
+        <button class="tool" id="pSlow">천천히</button>
+      </div>
     </div>
-    <div class="grid3">
-      <button class="tool rec" id="pRec">녹음</button>
-      <button class="tool" id="pMine" disabled>내 녹음</button>
-      <button class="tool" id="pCompare" disabled>번갈아 듣기</button>
+
+    <div class="stage s-rec">
+      <div class="stage-h"><span class="badge">2</span><svg><use href="#i-mic"/></svg><b>녹음하고 분석</b><span class="stage-d">정지하면 바로 분석해요</span></div>
+      <button class="tool fill big" id="pRec">녹음 시작</button>
+      <div class="result ana" id="ana" role="status" hidden>
+        <p class="focus" id="anaFocus"></p>
+        <ul class="metrics" id="anaList"></ul>
+        <span class="score">조용한 곳에서 녹음해야 잘 맞아요. 소리의 길이·쉼·높낮이로 잰 대략적인 결과예요.</span>
+      </div>
+      <div class="grid2">
+        <button class="tool" id="pMine" disabled>내 녹음 듣기</button>
+        <button class="tool" id="pCompare" disabled>원어민과 번갈아</button>
+      </div>
     </div>
-    <button class="tool" id="pAna" disabled>녹음 분석 (녹음하면 자동으로 나와요)</button>
-    <div class="result ana" id="ana" role="status" hidden>
-      <span class="small">녹음 분석</span>
-      <p class="focus" id="anaFocus"></p>
-      <ul class="metrics" id="anaList"></ul>
-      <span class="score">조용한 곳에서 녹음해야 잘 맞아요. 소리의 길이·쉼·높낮이로 잰 대략적인 결과예요.</span>
+
+    <div class="stage s-check">
+      <div class="stage-h"><span class="badge">3</span><svg><use href="#i-check"/></svg><b>발음 확인</b><span class="stage-d">말하면 글자로 채점해요</span></div>
+      <button class="tool fill big" id="pCheck">말하기</button>
+      <div class="result" id="result" role="status" hidden>
+        <span class="small">휴대폰이 알아들은 문장</span>
+        <span class="heard" id="heard"></span>
+        <div class="words" id="words"></div>
+        <span class="score" id="score"></span>
+      </div>
     </div>
-    <button class="tool" id="pCheck">발음 확인 (말하면 글자로 보여줘요)</button>
-    <div class="result" id="result" role="status" hidden>
-      <span class="small">휴대폰이 알아들은 문장</span>
-      <span class="heard" id="heard"></span>
-      <div class="words" id="words"></div>
-      <span class="score" id="score"></span>
+
+    <div class="foot">
+      <button class="chip" id="pReset">마이크 리셋</button>
+      <p class="small" id="pNote">녹음이나 발음 확인이 안 되면 리셋을 눌러요. 녹음은 이 휴대폰에만 남고, 앱을 다시 열면 지워져요.</p>
     </div>
-    <button class="chip" id="pReset" style="align-self:flex-start">마이크 리셋 (녹음·발음 확인이 안 될 때)</button>
-    <p class="small" id="pNote">녹음은 이 휴대폰에만 남고, 앱을 다시 열면 지워져요.</p>
   </section>
 
-  <section class="panel" aria-labelledby="ph2">
-    <h3 id="ph2">Claude와 연습</h3>
+  <!-- Claude -->
+  <section class="panel" role="tabpanel" id="pane-claude" aria-labelledby="tab-claude" hidden>
+    <h3>Claude와 연습</h3>
     <p class="small" id="claudeDesc"></p>
-    <div class="grid2">
-      <button class="tool accent" id="openClaude">Claude에서 열기</button>
-      <button class="tool" id="copyPrompt">문장만 복사</button>
-    </div>
+    <button class="tool accent big" id="openClaude">Claude에서 열기</button>
+    <button class="chip" id="copyPrompt" style="align-self:flex-start">문장만 복사</button>
     <div class="toast" id="toast" role="status"></div>
     <textarea class="copybox" id="copyBox" readonly hidden aria-label="복사할 연습 문장"></textarea>
   </section>
 
-  <section class="panel" aria-labelledby="ph3">
-    <h3 id="ph3">오늘 할 일 · <span id="stepCard">1강</span></h3>
-    <ul class="steps" id="steps"></ul>
-  </section>
   <p class="small" id="ver" style="text-align:center"></p>
 </div>
 
@@ -395,7 +466,9 @@ const CARDS = [
       ["A", "Nice talking to you. See you later!", "얘기 나눠서 즐거웠어요. 나중에 봐요!"]
     ] }
 ];
-const APP_VERSION = "11.23-5 (마이크 리셋)";
+const APP_VERSION = "11.23-6 (새 화면)";
+const MIC_ICON = '<svg><use href="#i-mic"/></svg>';
+const REC_LABEL = "녹음 시작";
 
 // 5강 미션: 완성 예시를 문장 단위로
 CARDS[4].lines = [
@@ -486,7 +559,7 @@ function renderCard(c) {
        <div class="script"><span class="en">${c.example}</span></div>
        ${sayBtns(c.example)}
        <p class="trans">${c.trans}</p>
-       <p class="hint">대본 없이 3번 말한 뒤, 아래 '녹음'으로 30초 안에 녹음해요</p>`;
+       <p class="hint">대본 없이 3번 말한 뒤, '문장 연습' 탭에서 녹음해요</p>`;
     return;
   }
   front.innerHTML = head(c, "앞면") +
@@ -529,7 +602,7 @@ function go(d) { const v = view(); if (!v.length) return; pos = (pos + d + v.len
 function flip() { if (!cur()) return; flipped = !flipped; render(); }
 
 /* ---------- 문장 연습: 녹음 / 비교 / 발음 확인 ---------- */
-const recs = {}, recBlobs = {};               // "강-문장" → blob URL (앱을 닫으면 사라짐)
+const recs = {}, recBlobs = {}, anaCache = {};               // "강-문장" → blob URL (앱을 닫으면 사라짐)
 let recorder = null, chunks = [], player = new Audio(), micStream = null;
 const key = () => `${cur().n}-${sel}`;
 const REC_OK = !!(navigator.mediaDevices && window.MediaRecorder);
@@ -543,9 +616,11 @@ function renderPractice(c) {
   $("tEn").textContent = ls[sel].en;
   $("tKo").textContent = ls[sel].ko;
   const has = !!recs[key()];
-  $("pMine").disabled = !has; $("pCompare").disabled = !has; $("pAna").disabled = !has;
+  $("pMine").disabled = !has; $("pCompare").disabled = !has;
   $("result").hidden = true;
-  $("ana").hidden = true;
+  const ac = anaCache[key()];
+  $("ana").hidden = !ac;
+  if (ac) { $("anaFocus").innerHTML = ac.f; $("anaList").innerHTML = ac.l; }
 }
 $("pick").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
@@ -582,7 +657,7 @@ $("pRec").onclick = async () => {
   recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   recorder.onstop = () => {
     stream.getTracks().forEach(t => t.stop()); if (micStream === stream) micStream = null;
-    btn.textContent = "녹음"; btn.classList.remove("on");
+    btn.textContent = REC_LABEL; btn.classList.remove("on");
     const sentence = target();
     let blob = null;
     if (chunks.length) {
@@ -592,11 +667,11 @@ $("pRec").onclick = async () => {
     }
     if (cur() && key() === k) {
       renderPractice(cur());
-      if (blob) analyze(blob, sentence);
+      if (blob) analyze(blob, sentence, k);
     }
   };
   recorder.start();
-  btn.textContent = "정지"; btn.classList.add("on");
+  btn.textContent = "정지하고 분석하기"; btn.classList.add("on");
 };
 function playMine() {
   return new Promise(res => {
@@ -606,7 +681,6 @@ function playMine() {
     player.play().catch(() => res());
   });
 }
-$("pAna").onclick = () => { const b = recBlobs[key()]; if (b) analyze(b, target()); };
 $("pMine").onclick = () => { stopAll(); playMine(); };
 $("pCompare").onclick = async () => {
   stopAll();
@@ -648,7 +722,7 @@ function pitchOf(x, sr) {          // 자기상관으로 목소리 높이(Hz) �
 }
 const median = a => { if (!a.length) return 0; const b = a.slice().sort((p, q) => p - q); return b[Math.floor(b.length / 2)]; };
 
-async function analyze(blob, sentence) {
+async function analyze(blob, sentence, k) {
   const box = $("ana");
   box.hidden = false;
   $("anaFocus").textContent = "분석하고 있어요…";
@@ -743,7 +817,9 @@ async function analyze(blob, sentence) {
     else focus = "아주 좋아요! 이제 '발음 확인'으로 단어가 정확히 들리는지 확인해 보세요.";
 
     $("anaFocus").innerHTML = `<span class="lab">고칠 곳 1개</span>${esc(focus)}`;
+    anaCache[k] = null;
     $("anaList").innerHTML = M.map(m => `<li><b>${m[0]}</b><span>${esc(m[1])}</span><span class="st ${m[2]}">${m[2] === "good" ? "좋아요" : m[2] === "warn" ? "고치기" : "측정 안 됨"}</span></li>`).join("");
+    anaCache[k] = { f: $("anaFocus").innerHTML, l: $("anaList").innerHTML };
   } catch (e) {
     $("anaFocus").textContent = e.message === "quiet"
       ? "소리가 너무 작아요. 휴대폰을 입 가까이 대고 다시 녹음해 보세요."
@@ -799,7 +875,7 @@ const failMsg = code =>
   : code === "network" ? "인터넷 연결이 필요해요. 연결을 확인하고 다시 해 보세요."
   : "잘 듣지 못했어요. 버튼을 누르고 1초 뒤에 또박또박 말해 보세요.";
 
-const CHECK_LABEL = "발음 확인 (말하면 글자로 보여줘요)";
+const CHECK_LABEL = "말하기";
 $("pCheck").onclick = () => {
   const btn = $("pCheck");
   if (!SR) {
@@ -839,9 +915,9 @@ function resetMic() {
   if (recorder && recorder.state !== "inactive") { recorder.onstop = null; try { recorder.stop(); } catch (e) {} }
   recorder = null;
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-  $("pRec").textContent = "녹음"; $("pRec").classList.remove("on");
+  $("pRec").textContent = REC_LABEL; $("pRec").classList.remove("on");
   $("pCheck").textContent = CHECK_LABEL; $("pCheck").classList.remove("on");
-  $("qSpeak").textContent = "말하기"; $("qSpeak").classList.remove("on");
+  $("qSpeak").innerHTML = MIC_ICON + "말하기"; $("qSpeak").classList.remove("on");
 }
 $("pReset").onclick = () => {
   resetMic();
@@ -874,7 +950,7 @@ function quizAsk() {
   $("qKo").textContent = q.ko;
   $("qAns").hidden = true; $("qAns").textContent = q.en;
   show("qRes", false); show("qSelf", false); show("qAfter", false); show("qAsk", true);
-  $("qSpeak").textContent = SR ? "말하기" : "말했어요 · 정답 보기";
+  $("qSpeak").innerHTML = SR ? MIC_ICON + "말하기" : "말했어요 · 정답 보기";
 }
 function quizJudge(ok, said, r) {
   if (ok) quiz.right++; else quiz.wrong.push(quiz.cur);
@@ -905,7 +981,7 @@ $("qSpeak").onclick = () => {
       $("qVerdict").textContent = failMsg(code);
       $("qHeard").textContent = ""; $("qWords").innerHTML = "";
     },
-    onEnd: () => { btn.classList.remove("on"); btn.textContent = "말하기"; }
+    onEnd: () => { btn.classList.remove("on"); btn.innerHTML = MIC_ICON + "말하기"; }
   });
 };
 $("qReveal").onclick = () => quizJudge(false, "", null);
@@ -941,7 +1017,7 @@ function renderClaude(c) {
   let p = CLAUDE[c.n];
   if (!p) {
     const ko = c.items.map((it, i) => `${i + 1}. ${it[0]}`).join(" ");
-    p = { desc: "한→영 연습은 위 '즉답 퀴즈'로 충분해요. Claude와 대화하듯 연습하고 싶을 때 'Claude에서 열기'를 누르면, Claude가 이 카드 문장으로 퀴즈를 내줘요.",
+    p = { desc: "한→영 연습은 '퀴즈' 탭으로 충분해요. Claude와 대화하듯 연습하고 싶을 때 'Claude에서 열기'를 누르면, Claude가 이 카드 문장으로 퀴즈를 내줘요.",
           text: `나는 영어 왕초보야. 한→영 즉답 연습을 도와줘. 아래 한국어 문장을 순서를 섞어서 하나씩만 말해줘. 내가 영어로 말하면 맞았는지 알려주고, 틀렸으면 정답을 천천히 두 번 말해줘. 다 끝나면 틀린 문장만 한 번 더 내줘. 문장: ${ko}` };
   }
   currentPrompt = p.text;
@@ -972,28 +1048,35 @@ $("copyPrompt").onclick = async () => {
 /* ---------- 오늘 할 일 ---------- */
 function stepList(c) {
   const s = [
-    ["듣기", "카드 뒷면이나 '문장 연습'의 듣기로 문장마다 3번 듣기"],
+    ["듣기", "'문장 연습' 탭 ① 듣기로 문장마다 3번 듣기"],
     ["따라 말하기", "문장마다 10번, 마지막 3번은 카드 보지 않고"],
-    ["즉답 퀴즈", "'즉답 퀴즈'에서 모든 문장 정답 받기"],
-    ["녹음하고 비교", "'녹음' → '번갈아 듣기'로 원어민 음성과 비교하고 다른 곳 1개 고치기"],
-    ["발음 확인", "'발음 확인'으로 말해 보고, 모든 단어가 초록색이면 통과"],
-    ["Claude와 연습", "'Claude에서 열기'로 상황극·피드백 연습"]
+    ["퀴즈", "'퀴즈' 탭에서 모든 문장 정답 받기"],
+    ["녹음하고 분석", "② 녹음 → '고칠 곳 1개'를 고쳐서 다시 녹음"],
+    ["발음 확인", "③ 발음 확인에서 모든 단어가 초록색이면 통과"],
+    ["Claude와 연습", "'Claude' 탭에서 상황극·피드백 연습"]
   ];
-  if (!CLAUDE[c.n]) s.pop();
   if (c.type === "mission") s.splice(2, 1, ["대본 완성", "빈칸을 내 정보로 채우고 대본 없이 3번 말하기"]);
+  if (!CLAUDE[c.n]) s.pop();
   return s;
 }
 function renderSteps(c) {
   $("stepCard").textContent = c.n + "강";
-  const done = steps[c.n] || [];
-  $("steps").innerHTML = stepList(c).map((s, i) =>
-    `<li><label><input type="checkbox" data-i="${i}"${done.includes(i) ? " checked" : ""}><span><b>${s[0]}</b><span class="d">${s[1]}</span></span></label></li>`).join("");
+  const done = steps[c.n] || [], list = stepList(c);
+  $("steps").innerHTML = list.map((st, i) =>
+    `<li><label><input type="checkbox" data-i="${i}"${done.includes(i) ? " checked" : ""}><span><b>${st[0]}</b><span class="d">${st[1]}</span></span></label></li>`).join("");
+  renderPips(c);
+}
+function renderPips(c) {
+  const done = (steps[c.n] || []).length, total = stepList(c).length;
+  $("pips").innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i < done ? "on" : ""}"></i>`).join("");
+  $("todayN").textContent = `${Math.min(done, total)}/${total}`;
 }
 $("steps").addEventListener("change", e => {
   const c = cur(); if (!c) return;
   const set = new Set(steps[c.n] || []), i = +e.target.dataset.i;
   e.target.checked ? set.add(i) : set.delete(i);
   steps[c.n] = [...set]; store.set("iptgi-steps-w1", steps);
+  renderPips(c);
 });
 
 /* ---------- 조작 ---------- */
@@ -1048,6 +1131,19 @@ if (!standalone) {
 $("ver").textContent = "버전 " + APP_VERSION;
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 if (!TTS) { $("pListen").disabled = true; $("pSlow").disabled = true; }
+
+/* ---------- 탭 ---------- */
+const TABS = ["quiz", "practice", "claude"];
+function setTab(name) {
+  TABS.forEach(t => {
+    $("tab-" + t).setAttribute("aria-selected", t === name);
+    $("pane-" + t).hidden = t !== name;
+  });
+  store.set("iptgi-tab", name);
+}
+TABS.forEach(t => $("tab-" + t).onclick = () => { if (t !== "practice") stopAll(); setTab(t); });
+setTab(TABS.includes(store.get("iptgi-tab", "quiz")) ? store.get("iptgi-tab", "quiz") : "quiz");
+
 
 render();
 </script>
