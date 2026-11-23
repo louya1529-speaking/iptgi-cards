@@ -291,7 +291,7 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
   <div class="tabs" role="tablist" aria-label="연습 방법">
     <button role="tab" id="tab-quiz" aria-controls="pane-quiz" aria-selected="true"><svg><use href="#i-quiz"/></svg>퀴즈</button>
     <button role="tab" id="tab-practice" aria-controls="pane-practice" aria-selected="false"><svg><use href="#i-practice"/></svg>문장 연습</button>
-    <button role="tab" id="tab-claude" aria-controls="pane-claude" aria-selected="false"><svg><use href="#i-claude"/></svg>Claude</button>
+    <button role="tab" id="tab-claude" aria-controls="pane-claude" aria-selected="false"><svg><use href="#i-claude"/></svg>AI 연습</button>
   </div>
 
   <!-- 퀴즈 -->
@@ -383,7 +383,7 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 
   <!-- Claude -->
   <section class="panel" role="tabpanel" id="pane-claude" aria-labelledby="tab-claude" hidden>
-    <h3>Claude와 연습</h3>
+    <h3>AI와 연습</h3>
     <p class="small" id="claudeDesc"></p>
     <button class="tool accent big" id="openClaude">Claude에서 열기</button>
     <button class="chip" id="copyPrompt" style="align-self:flex-start">문장만 복사</button>
@@ -468,7 +468,7 @@ const CARDS = [
       ["A", "Nice talking to you. See you later!", "얘기 나눠서 즐거웠어요. 나중에 봐요!"]
     ] }
 ];
-const APP_VERSION = "11.23-7 (미션 전체 녹음)";
+const APP_VERSION = "11.23-8 (AI와 연습)";
 const MIC_ICON = '<svg><use href="#i-mic"/></svg>';
 const REC_LABEL = "녹음 시작";
 
@@ -1076,7 +1076,7 @@ function stepList(c) {
     ["퀴즈", "'퀴즈' 탭에서 모든 문장 정답 받기"],
     ["녹음하고 분석", "② 녹음 → '고칠 곳 1개'를 고쳐서 다시 녹음"],
     ["발음 확인", "③ 발음 확인에서 모든 단어가 초록색이면 통과"],
-    ["Claude와 연습", "'Claude' 탭에서 상황극·피드백 연습"]
+    ["AI와 연습", "'AI 연습' 탭에서 상황극·피드백 연습"]
   ];
   if (c.type === "mission") s.splice(2, 1, ["대본 완성", "빈칸을 내 정보로 채우고 대본 없이 3번 말하기"]);
   if (!CLAUDE[c.n]) s.pop();
