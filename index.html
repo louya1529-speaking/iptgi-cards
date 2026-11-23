@@ -243,6 +243,8 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 .today .steps { padding-bottom: 10px; }
 
 .pick button.full { padding: 0 12px; font-family: var(--f-body); font-weight: 600; }
+.tabs.two { grid-template-columns: repeat(2, 1fr); }
+.tabs button[hidden] { display: none; }
 </style>
 
 </head>
@@ -468,7 +470,7 @@ const CARDS = [
       ["A", "Nice talking to you. See you later!", "얘기 나눠서 즐거웠어요. 나중에 봐요!"]
     ] }
 ];
-const APP_VERSION = "11.23-8 (AI와 연습)";
+const APP_VERSION = "11.23-9 (AI 연습 정리)";
 const MIC_ICON = '<svg><use href="#i-mic"/></svg>';
 const REC_LABEL = "녹음 시작";
 
@@ -591,6 +593,7 @@ function render() {
   $("know").textContent = k ? "외웠음 ✓" : "외웠어요";
   $("know").classList.toggle("known", k);
   renderPractice(c); renderClaude(c); renderSteps(c);
+  syncTabs(c);
   if (quiz.n !== c.n) quizReset(c);
 }
 function renderDots() {
@@ -1028,21 +1031,24 @@ $("qRestart").onclick = () => quizStart(lines(cur()).filter(l => !l.full));
 
 /* ---------- Claude와 연습 ---------- */
 const CLAUDE = {
-  4: { desc: "Claude 음성 모드에서 아래 문장을 읽으면 줄임말 발음 연습이 시작돼요. Claude가 내 말을 I am으로 알아들었다면 아직 끊어서 말하고 있는 거예요.",
-       text: "나는 영어 왕초보야. I'm, You're, He's, It's, We're가 들어간 짧은 문장을 하나씩 천천히 한 번, 자연스러운 속도로 한 번 말해줘. 내가 따라 하면, 네가 들은 문장을 글자 그대로 다시 말해줘. 그다음 문장으로 넘어가." },
   5: { desc: "Claude 음성 모드에서 아래 문장을 읽고 내 자기소개를 말해 보세요. 알아듣기 어려웠던 부분을 알려줘요.",
        text: "나는 영어 왕초보야. 지금부터 영어로 30초 자기소개를 할게. 다 들으면 네가 들은 문장을 글자 그대로 다시 말해주고, 알아듣기 어려웠던 단어와 더 자연스럽게 고칠 문장을 딱 하나씩만 쉬운 한국어로 알려줘." },
   6: { desc: "예시 대화를 외운 뒤, Claude 음성 모드에서 아래 문장을 읽으면 상황극이 시작돼요. 끝나면 역할을 바꿔 한 번 더 해요.",
        text: "상황극 하자. 너는 한국에 처음 온 캐나다 사람 Tom이야. 나는 영어 왕초보라서 아주 쉬운 문장만 써줘. 네가 먼저 Hi로 시작하고, 나한테 이름, 출신, 직업을 물어봐. 한 번에 한 문장씩만 말해줘. 끝나면 내가 틀린 문장을 쉬운 문장으로 고쳐줘." }
 };
 let currentPrompt = "";
+// AI 연습은 대화문 강의(상황극)와 실전미션(내 대본 피드백)에서만 보여요
+const hasAI = c => !!c && (!!c.dialog || c.type === "mission");
 function renderClaude(c) {
+  if (!hasAI(c)) return;
   let p = CLAUDE[c.n];
-  if (!p) {
-    const ko = c.items.map((it, i) => `${i + 1}. ${it[0]}`).join(" ");
-    p = { desc: "한→영 연습은 '퀴즈' 탭으로 충분해요. Claude와 대화하듯 연습하고 싶을 때 'Claude에서 열기'를 누르면, Claude가 이 카드 문장으로 퀴즈를 내줘요.",
-          text: `나는 영어 왕초보야. 한→영 즉답 연습을 도와줘. 아래 한국어 문장을 순서를 섞어서 하나씩만 말해줘. 내가 영어로 말하면 맞았는지 알려주고, 틀렸으면 정답을 천천히 두 번 말해줘. 다 끝나면 틀린 문장만 한 번 더 내줘. 문장: ${ko}` };
+  if (!p && c.dialog) {
+    const d = c.dialog.map(x => `${x[0]}: ${x[1]}`).join(" / ");
+    p = { desc: "예시 대화를 외운 뒤 'Claude에서 열기'를 누르면 상황극이 시작돼요. 끝나면 역할을 바꿔 한 번 더 해요.",
+          text: `상황극 하자. 나는 영어 왕초보야. 아래 예시 대화와 비슷한 상황에서 네가 B 역할을 해줘. 아주 쉬운 문장만, 한 번에 한 문장씩 말해줘. 네가 먼저 시작해. 끝나면 내가 틀린 문장을 쉬운 문장으로 고쳐줘. 예시 대화: ${d}` };
   }
+  if (!p) p = { desc: "'Claude에서 열기'를 누르고 내 대본을 말하면, Claude가 알아듣기 어려운 부분과 고칠 문장을 알려줘요.",
+                text: "나는 영어 왕초보야. 지금부터 영어로 짧게 말할게. 다 들으면 네가 들은 문장을 글자 그대로 다시 말해주고, 알아듣기 어려웠던 단어와 더 자연스럽게 고칠 문장을 딱 하나씩만 쉬운 한국어로 알려줘." };
   currentPrompt = p.text;
   $("claudeDesc").textContent = p.desc;
   $("copyBox").hidden = true; $("toast").textContent = "";
@@ -1079,7 +1085,7 @@ function stepList(c) {
     ["AI와 연습", "'AI 연습' 탭에서 상황극·피드백 연습"]
   ];
   if (c.type === "mission") s.splice(2, 1, ["대본 완성", "빈칸을 내 정보로 채우고 대본 없이 3번 말하기"]);
-  if (!CLAUDE[c.n]) s.pop();
+  if (!hasAI(c)) s.pop();
   return s;
 }
 function renderSteps(c) {
@@ -1157,15 +1163,22 @@ if (!TTS) { $("pListen").disabled = true; $("pSlow").disabled = true; }
 
 /* ---------- 탭 ---------- */
 const TABS = ["quiz", "practice", "claude"];
-function setTab(name) {
+function setTab(name, save = true) {
   TABS.forEach(t => {
     $("tab-" + t).setAttribute("aria-selected", t === name);
     $("pane-" + t).hidden = t !== name;
   });
-  store.set("iptgi-tab", name);
+  if (save) store.set("iptgi-tab", name);
+}
+function syncTabs(c) {    // 이 카드에 AI 연습이 없으면 탭을 숨기고 퀴즈로
+  const ai = hasAI(c);
+  $("tab-claude").hidden = !ai;
+  document.querySelector(".tabs").classList.toggle("two", !ai);
+  let want = store.get("iptgi-tab", "quiz");
+  if (!TABS.includes(want) || (want === "claude" && !ai)) want = "quiz";
+  setTab(want, false);
 }
 TABS.forEach(t => $("tab-" + t).onclick = () => { if (t !== "practice") stopAll(); setTab(t); });
-setTab(TABS.includes(store.get("iptgi-tab", "quiz")) ? store.get("iptgi-tab", "quiz") : "quiz");
 
 
 render();
