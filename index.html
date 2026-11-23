@@ -184,6 +184,15 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
 .install[hidden] { display: none; }
 .dock-in { grid-template-columns: 56px 1fr 1fr 56px; }
 .say { margin-right: 6px; }
+#qIdle, #qRun, #qDone { display: flex; flex-direction: column; gap: 12px; }
+#qIdle[hidden], #qRun[hidden], #qDone[hidden], #qAsk[hidden], #qSelf[hidden], #qAfter[hidden] { display: none; }
+.qhead { display: flex; justify-content: space-between; align-items: center; }
+.qcard { min-height: 96px; justify-content: center; }
+.qko { font-size: 21px; font-weight: 600; }
+.qcard .en[hidden] { display: none; }
+.qverdict { font-size: 16px; font-weight: 700; margin: 0; }
+.qverdict.good { color: var(--t-review); }
+.qverdict.bad { color: var(--t-mission); }
 .say.slow { color: var(--muted); }
 </style>
 
@@ -211,6 +220,45 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
       <section class="face back" id="back"></section>
     </div>
   </div>
+
+  <section class="panel" aria-labelledby="pq">
+    <h3 id="pq">즉답 퀴즈 · 한국어를 보고 영어로 말하기</h3>
+    <div id="qIdle">
+      <p class="small" id="qIntro">이 카드 문장이 순서를 섞어 하나씩 나와요. 영어로 말하면 앱이 채점하고, 틀린 문장은 끝에 다시 나와요.</p>
+      <button class="tool accent" id="qStart">퀴즈 시작</button>
+    </div>
+    <div id="qRun" hidden>
+      <div class="qhead"><span class="score" id="qCount"></span><button class="chip" id="qQuit">그만하기</button></div>
+      <div class="target qcard">
+        <span class="ko qko" id="qKo"></span>
+        <span class="en" id="qAns" hidden></span>
+      </div>
+      <div class="grid2" id="qAsk">
+        <button class="tool rec" id="qSpeak">말하기</button>
+        <button class="tool" id="qReveal">모르겠어요 · 정답 보기</button>
+      </div>
+      <div class="result" id="qRes" hidden>
+        <span class="qverdict" id="qVerdict"></span>
+        <span class="heard" id="qHeard"></span>
+        <div class="words" id="qWords"></div>
+      </div>
+      <div class="grid2" id="qSelf" hidden>
+        <button class="tool" id="qGood">맞게 말했어요</button>
+        <button class="tool" id="qBad">틀렸어요</button>
+      </div>
+      <div class="grid2" id="qAfter" hidden>
+        <button class="tool" id="qAgain">정답 다시 듣기</button>
+        <button class="tool accent" id="qNext">다음 문제</button>
+      </div>
+    </div>
+    <div id="qDone" hidden>
+      <p class="qverdict" id="qSummary"></p>
+      <div class="grid2">
+        <button class="tool accent" id="qRetry">틀린 문장 다시</button>
+        <button class="tool" id="qRestart">처음부터 다시</button>
+      </div>
+    </div>
+  </section>
 
   <section class="panel" aria-labelledby="pp">
     <h3 id="pp">문장 연습 · 듣고, 녹음하고, 확인하기</h3>
@@ -241,7 +289,10 @@ button:focus-visible, .card:focus-visible { outline: 2px solid var(--accent); ou
   <section class="panel" aria-labelledby="ph2">
     <h3 id="ph2">Claude와 연습</h3>
     <p class="small" id="claudeDesc"></p>
-    <button class="tool accent" id="copyPrompt">연습 문장 복사</button>
+    <div class="grid2">
+      <button class="tool accent" id="openClaude">Claude에서 열기</button>
+      <button class="tool" id="copyPrompt">문장만 복사</button>
+    </div>
     <div class="toast" id="toast" role="status"></div>
     <textarea class="copybox" id="copyBox" readonly hidden aria-label="복사할 연습 문장"></textarea>
   </section>
@@ -441,6 +492,7 @@ function render() {
   $("know").textContent = k ? "외웠음 ✓" : "외웠어요";
   $("know").classList.toggle("known", k);
   renderPractice(c); renderClaude(c); renderSteps(c);
+  if (quiz.n !== c.n) quizReset(c);
 }
 function renderDots() {
   const c = cur();
@@ -577,6 +629,96 @@ $("pCheck").onclick = () => {
   try { rec.start(); } catch (e) { rec = null; btn.textContent = "발음 확인 (말하면 글자로 보여줘요)"; }
 };
 
+/* ---------- 즉답 퀴즈 ---------- */
+const quiz = { n: null, queue: [], i: 0, wrong: [], total: 0, right: 0, cur: null, listening: null };
+function show(id, on) { $(id).hidden = !on; }
+function quizReset(c) {
+  if (quiz.listening) { try { quiz.listening.abort(); } catch (e) {} quiz.listening = null; }
+  quiz.n = c ? c.n : null;
+  show("qIdle", true); show("qRun", false); show("qDone", false);
+  $("qIntro").textContent = SR
+    ? "이 카드 문장이 순서를 섞어 하나씩 나와요. 영어로 말하면 앱이 채점하고, 틀린 문장은 끝에서 다시 나와요."
+    : "이 카드 문장이 순서를 섞어 하나씩 나와요. 이 브라우저는 음성 채점이 안 돼서, 소리 내어 말한 뒤 정답을 보고 직접 맞았는지 눌러 주세요.";
+}
+function quizStart(list) {
+  quiz.queue = list.slice();
+  for (let i = quiz.queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [quiz.queue[i], quiz.queue[j]] = [quiz.queue[j], quiz.queue[i]]; }
+  quiz.i = 0; quiz.wrong = []; quiz.right = 0; quiz.total = quiz.queue.length;
+  show("qIdle", false); show("qDone", false); show("qRun", true);
+  quizAsk();
+}
+function quizAsk() {
+  stopAll();
+  const q = quiz.cur = quiz.queue[quiz.i];
+  $("qCount").textContent = `${quiz.i + 1} / ${quiz.total}`;
+  $("qKo").textContent = q.ko;
+  $("qAns").hidden = true; $("qAns").textContent = q.en;
+  show("qRes", false); show("qSelf", false); show("qAfter", false); show("qAsk", true);
+  $("qSpeak").textContent = SR ? "말하기" : "말했어요 · 정답 보기";
+}
+function quizJudge(ok, said, r) {
+  if (ok) quiz.right++; else quiz.wrong.push(quiz.cur);
+  $("qAns").hidden = false;
+  show("qAsk", false); show("qSelf", false); show("qRes", true); show("qAfter", true);
+  const v = $("qVerdict");
+  v.className = "qverdict " + (ok ? "good" : "bad");
+  v.textContent = ok ? "정답이에요!" : "다시 들어 보세요. 정답을 천천히 두 번 읽어줘요.";
+  $("qHeard").textContent = said ? `들린 문장: "${said}"` : "";
+  $("qWords").innerHTML = r ? r.map(x => `<span class="${x.ok ? "ok" : "miss"}">${esc(x.w)}</span>`).join("") : "";
+  $("qNext").textContent = quiz.i + 1 < quiz.total ? "다음 문제" : "결과 보기";
+  if (ok) speak([quiz.cur.en], 0.9); else speak([quiz.cur.en, quiz.cur.en], 0.65);
+}
+$("qStart").onclick = () => quizStart(lines(cur()));
+$("qQuit").onclick = () => quizReset(cur());
+$("qSpeak").onclick = () => {
+  const btn = $("qSpeak");
+  if (!SR) { $("qAns").hidden = false; show("qAsk", false); show("qSelf", true); speak([quiz.cur.en], 0.9); return; }
+  if (quiz.listening) { quiz.listening.stop(); return; }
+  stopAll();
+  const r = new SR(); quiz.listening = r;
+  r.lang = "en-US"; r.interimResults = false; r.maxAlternatives = 1;
+  btn.textContent = "듣고 있어요… (누르면 끝)"; btn.classList.add("on");
+  let got = false;
+  r.onresult = e => {
+    got = true;
+    const said = e.results[0][0].transcript;
+    const res = compare(said, quiz.cur.en);
+    quizJudge(res.every(x => x.ok), said, res);
+  };
+  r.onerror = e => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      $("qIntro").textContent = "마이크나 음성 인식이 허용되지 않았어요. 휴대폰 설정에서 허용해 주세요.";
+    }
+  };
+  r.onend = () => {
+    quiz.listening = null; btn.classList.remove("on"); btn.textContent = "말하기";
+    if (!got && !$("qRun").hidden && !$("qAsk").hidden) {
+      show("qRes", true); $("qVerdict").className = "qverdict bad";
+      $("qVerdict").textContent = "잘 듣지 못했어요. '말하기'를 누르고 다시 말해 주세요.";
+      $("qHeard").textContent = ""; $("qWords").innerHTML = "";
+    }
+  };
+  try { r.start(); } catch (e) { quiz.listening = null; btn.textContent = "말하기"; btn.classList.remove("on"); }
+};
+$("qReveal").onclick = () => quizJudge(false, "", null);
+$("qGood").onclick = () => quizJudge(true, "", null);
+$("qBad").onclick = () => quizJudge(false, "", null);
+$("qAgain").onclick = () => speak([quiz.cur.en], 0.65);
+$("qNext").onclick = () => {
+  quiz.i++;
+  if (quiz.i < quiz.total) return quizAsk();
+  stopAll();
+  show("qRun", false); show("qDone", true);
+  const s = $("qSummary");
+  s.className = "qverdict " + (quiz.wrong.length ? "bad" : "good");
+  s.textContent = quiz.wrong.length
+    ? `${quiz.total}문장 중 ${quiz.right}개 정답. 틀린 ${quiz.wrong.length}문장을 다시 해 봐요.`
+    : `${quiz.total}문장 모두 정답! 이 카드는 '외웠어요'를 눌러도 좋아요.`;
+  show("qRetry", quiz.wrong.length > 0);
+};
+$("qRetry").onclick = () => quizStart(quiz.wrong);
+$("qRestart").onclick = () => quizStart(lines(cur()));
+
 /* ---------- Claude와 연습 ---------- */
 const CLAUDE = {
   4: { desc: "Claude 음성 모드에서 아래 문장을 읽으면 줄임말 발음 연습이 시작돼요. Claude가 내 말을 I am으로 알아들었다면 아직 끊어서 말하고 있는 거예요.",
@@ -591,13 +733,23 @@ function renderClaude(c) {
   let p = CLAUDE[c.n];
   if (!p) {
     const ko = c.items.map((it, i) => `${i + 1}. ${it[0]}`).join(" ");
-    p = { desc: "Claude 채팅이나 음성 모드에 붙여 넣으면, Claude가 이 카드의 한국어 문장을 하나씩 내고 내 영어 대답을 확인해줘요.",
+    p = { desc: "한→영 연습은 위 '즉답 퀴즈'로 충분해요. Claude와 대화하듯 연습하고 싶을 때 'Claude에서 열기'를 누르면, Claude가 이 카드 문장으로 퀴즈를 내줘요.",
           text: `나는 영어 왕초보야. 한→영 즉답 연습을 도와줘. 아래 한국어 문장을 순서를 섞어서 하나씩만 말해줘. 내가 영어로 말하면 맞았는지 알려주고, 틀렸으면 정답을 천천히 두 번 말해줘. 다 끝나면 틀린 문장만 한 번 더 내줘. 문장: ${ko}` };
   }
   currentPrompt = p.text;
   $("claudeDesc").textContent = p.desc;
   $("copyBox").hidden = true; $("toast").textContent = "";
 }
+$("openClaude").onclick = async () => {
+  let copied = false;
+  try { await navigator.clipboard.writeText(currentPrompt); copied = true; } catch (e) {}
+  $("toast").textContent = copied
+    ? "Claude를 여는 중이에요. 입력창이 비어 있으면 길게 눌러 붙여넣기 한 뒤 보내 주세요. 음성 모드라면 문장을 그대로 읽어도 돼요."
+    : "Claude를 여는 중이에요. 입력창이 비어 있으면 '문장만 복사'로 복사해서 붙여 넣어 주세요.";
+  const url = "https://claude.ai/new?q=" + encodeURIComponent(currentPrompt);
+  const w = window.open(url, "_blank");
+  if (!w) location.href = url;
+};
 $("copyPrompt").onclick = async () => {
   try {
     await navigator.clipboard.writeText(currentPrompt);
@@ -614,11 +766,12 @@ function stepList(c) {
   const s = [
     ["듣기", "카드 뒷면이나 '문장 연습'의 듣기로 문장마다 3번 듣기"],
     ["따라 말하기", "문장마다 10번, 마지막 3번은 카드 보지 않고"],
-    ["한→영 즉답", "앞면만 보고 2초 안에 말하기. 막힌 문장은 다시"],
+    ["즉답 퀴즈", "'즉답 퀴즈'에서 모든 문장 정답 받기"],
     ["녹음하고 비교", "'녹음' → '번갈아 듣기'로 원어민 음성과 비교하고 다른 곳 1개 고치기"],
     ["발음 확인", "'발음 확인'으로 말해 보고, 모든 단어가 초록색이면 통과"],
-    ["Claude와 연습", "'연습 문장 복사'로 Claude와 연습"]
+    ["Claude와 연습", "'Claude에서 열기'로 상황극·피드백 연습"]
   ];
+  if (!CLAUDE[c.n]) s.pop();
   if (c.type === "mission") s.splice(2, 1, ["대본 완성", "빈칸을 내 정보로 채우고 대본 없이 3번 말하기"]);
   return s;
 }
